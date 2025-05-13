@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'variables.dart'; // Import the variables.dart file containing data arrays and labels
+import 'settings.dart';
+import 'notifications.dart';
 
 class GraphPage extends StatelessWidget {
   const GraphPage({super.key});
@@ -230,7 +232,21 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: () {
+        if (widget.iconData == Icons.settings) {
+          // Navigate to Settings page
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SettingsPage()),
+          );
+        } else if (widget.iconData == Icons.notifications_none) {
+          // Navigate to Notifications page
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const NotificationsPage()),
+          );
+        }
+      },
       borderRadius: BorderRadius.circular(50),
       splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
       highlightColor: const Color.fromRGBO(0, 123, 255, 0.1),

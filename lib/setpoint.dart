@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'variables.dart'; // Import the variables file
 import 'package:dropdown_button2/dropdown_button2.dart';
+import 'settings.dart';
+import 'notifications.dart';
 
 class SetpointPage extends StatefulWidget {
   const SetpointPage({super.key});
@@ -509,19 +511,52 @@ class SetpointPageState extends State<SetpointPage> {
                       const SizedBox(height: 10),
                     ],
 
-                    ElevatedButton(
-                      onPressed: () {
-                        if (selectedParameter == 'Temperature') {
-                          _saveTemperatureSetpoints();
-                        } else if (selectedParameter == 'Humidity') {
-                          _saveHumiditySetpoints();
-                        } else if (selectedParameter == 'CO₂') {
-                          _saveCO2Setpoints();
-                        } else if (selectedParameter == 'Light') {
-                          _saveLightSetpoints();
-                        }
-                      },
-                      child: const Text("Save Setpoints"),
+                    SizedBox(
+                      width:
+                          MediaQuery.of(
+                            context,
+                          ).size.width, // Set the width to the screen's width
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: () {
+                          if (selectedParameter == 'Temperature') {
+                            _saveTemperatureSetpoints();
+                          } else if (selectedParameter == 'Humidity') {
+                            _saveHumiditySetpoints();
+                          } else if (selectedParameter == 'CO₂') {
+                            _saveCO2Setpoints();
+                          } else if (selectedParameter == 'Light') {
+                            _saveLightSetpoints();
+                          }
+                        },
+                        child: Row(
+                          mainAxisSize:
+                              MainAxisSize
+                                  .min, // Ensure the row only takes as much space as needed
+                          children: const [
+                            Icon(
+                              Icons.save_as,
+                              color: Colors.white,
+                            ), // Save icon on the left
+                            SizedBox(
+                              width: 8,
+                            ), // Add some space between the icon and text
+                            Text(
+                              "Save Setpoints",
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
 
                     const SizedBox(height: 20),
@@ -867,7 +902,21 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: () {
+        if (widget.iconData == Icons.settings) {
+          // Navigate to Settings page
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SettingsPage()),
+          );
+        } else if (widget.iconData == Icons.notifications_none) {
+          // Navigate to Notifications page
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const NotificationsPage()),
+          );
+        }
+      },
       borderRadius: BorderRadius.circular(50),
       splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
       highlightColor: const Color.fromRGBO(0, 123, 255, 0.1),
