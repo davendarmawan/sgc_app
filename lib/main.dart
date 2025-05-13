@@ -28,7 +28,7 @@ class SmartFarmApp extends StatelessWidget {
     return MaterialApp(
       title: 'SmartFarm',
       theme: ThemeData(
-        primaryColor: const Color(0xFF0D47A1),
+        primaryColor: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
         fontFamily: GoogleFonts.nunito().fontFamily,
       ),

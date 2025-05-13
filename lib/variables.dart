@@ -1,4 +1,9 @@
 // File to store variables to the app data
+/* Home Menu Data */
+String temperature = '35.0';
+String humidity = '75.0';
+String co2 = '150.0';
+String lightIntensity = '1000.0';
 
 /* Graph Menu Data*/
 
@@ -188,18 +193,34 @@ double nightHumidity = 0; // Default for night
 double dayCO2 = 0; // Default for day
 double nightCO2 = 0; // Default for night
 
-// Light Mode (Day or Night)
-String lightModeDay = 'Mode 1'; // Default light mode for Day
-String lightModeNight = 'Mode 1'; // Default light mode for Night
+// Light Intensity data for day and night (lux)
+double dayLightIntensity = 0; // Default for day
+double nightLightIntensity = 0; // Default for night
 
-// Light intensity setpoints (in Lux) for Day and Night
-double dayLightIntensity = 200; // Default day light intensity
-double nightLightIntensity = 200; // Default night light intensity
+// Light Modes for Day and Night
+String dayLightMode = 'Mode 1'; // Default for day
+String nightLightMode = 'Mode 1'; // Default for night
 
-// Brightness settings for Manual mode (Day and Night) as percentages (0-100%)
-double dayPARBrightness = 50; // Default brightness for Day PAR Light
-double dayRedBrightness = 50; // Default brightness for Day Red Light
-double dayBlueBrightness = 50; // Default brightness for Day Blue Light
-double nightPARBrightness = 50; // Default brightness for Night PAR Light
-double nightRedBrightness = 50; // Default brightness for Night Red Light
-double nightBlueBrightness = 50; // Default brightness for Night Blue Light
+// Light PWM for Manual Mode (Day)
+double parDayPWM = 0.0;
+double redDayPWM = 0.0;
+double blueDayPWM = 0.0;
+double uvDayPWM = 0.0;
+double irDayPWM = 0.0;
+
+// Light PWM for Manual Mode (Night)
+double parNightPWM = 0.0;
+double redNightPWM = 0.0;
+double blueNightPWM = 0.0;
+double uvNightPWM = 0.0;
+double irNightPWM = 0.0;
+
+// Light Mode Options (used for dropdown)
+List<String> modeDescriptions = [
+  'Mode 1: PAR Light Only',
+  'Mode 2: PAR Light + Red Light',
+  'Mode 3: PAR Light + Blue Light',
+  'Mode 4: PAR + Red + Blue + UV + IR',
+  'Mode 5: All lights off',
+  'Manual',
+];

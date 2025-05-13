@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'variables.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -120,39 +121,39 @@ class HomePage extends StatelessWidget {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             childAspectRatio: screenWidth * 3 / screenHeight,
-                            children: const [
+                            children: [
                               SensorCard(
                                 title: 'Temperature',
-                                value: '26.1',
+                                value: temperature,
                                 unit: '°C',
-                                setpoint: '26.0',
+                                setpoint: getSetpoint('temperature'),
                                 icon: Icons.thermostat,
                                 iconColor: Colors.redAccent,
                               ),
                               SensorCard(
                                 title: 'Humidity',
-                                value: '81',
+                                value: humidity,
                                 unit: '%',
-                                setpoint: '80',
+                                setpoint: getSetpoint('humidity'),
                                 icon: Icons.water_drop,
                                 iconColor: Colors.blueAccent,
                               ),
                               SensorCard(
                                 title: 'CO₂',
-                                value: '401',
+                                value: co2,
                                 unit: 'ppm',
-                                setpoint: '400',
+                                setpoint: getSetpoint('co2'),
                                 icon: Icons.cloud,
                                 iconColor: Colors.green,
                               ),
                               SensorCard(
                                 title: 'Light',
-                                value: '2801',
+                                value: lightIntensity,
                                 unit: 'LUX',
-                                setpoint: '2800',
+                                setpoint: getSetpoint('light'),
                                 icon: Icons.wb_sunny,
                                 iconColor: Colors.orangeAccent,
-                                extraInfo: 'Mode 2',
+                                extraInfo: getMode('light'),
                               ),
                             ],
                           ),
@@ -193,6 +194,65 @@ class HomePage extends StatelessWidget {
         iconColor: const Color.fromARGB(255, 83, 83, 83),
       );
     }
+  }
+
+  // Method to get the correct setpoint based on the time of day
+  String getSetpoint(String sensor) {
+    final int hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 18) {
+      // Daytime values
+      switch (sensor) {
+        case 'temperature':
+          return '${dayTemperature.toString()} °C';
+        case 'humidity':
+          return '${dayHumidity.toString()} %';
+        case 'co2':
+          return '${dayCO2.toString()} ppm';
+        case 'light':
+          if (dayLightMode == 'Manual') {
+            return 'Custom';
+          } else {
+            return '${dayLightIntensity.toString()} LUX';
+          }
+        default:
+          return '0';
+      }
+    } else {
+      // Nighttime values
+      switch (sensor) {
+        case 'temperature':
+          return '${dayTemperature.toString()} °C';
+        case 'humidity':
+          return '${dayHumidity.toString()} %';
+        case 'co2':
+          return '${dayCO2.toString()} ppm';
+        case 'light':
+          if (nightLightMode == 'Manual') {
+            return 'Custom';
+          } else {
+            return '${nightLightIntensity.toString()} LUX';
+          }
+        default:
+          return '0';
+      }
+    }
+  }
+
+  // Method to get the correct mode based on the time of day
+  String getMode(String sensor) {
+    final int hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 18) {
+      // Daytime mode
+      if (sensor == 'light') {
+        return dayLightMode; // Return the day mode
+      }
+    } else {
+      // Nighttime mode
+      if (sensor == 'light') {
+        return nightLightMode; // Return the night mode
+      }
+    }
+    return '';
   }
 }
 
@@ -344,7 +404,7 @@ class SensorCard extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            'Setpoint: $setpoint $unit',
+            'Setpoint: $setpoint',
             style: TextStyle(fontSize: setpointFontSize, color: Colors.black54),
           ),
         ],

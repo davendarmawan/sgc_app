@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'variables.dart'; // Import the variables file
+import 'package:dropdown_button2/dropdown_button2.dart';
 
 class SetpointPage extends StatefulWidget {
   const SetpointPage({super.key});
@@ -27,20 +28,27 @@ class SetpointPageState extends State<SetpointPage> {
   final TextEditingController _dayCO2Controller = TextEditingController();
   final TextEditingController _nightCO2Controller = TextEditingController();
 
+  // Light settings controllers
+  final TextEditingController _dayLightIntensityController =
+      TextEditingController();
+  final TextEditingController _nightLightIntensityController =
+      TextEditingController();
+
+  int lightModeDay = 1; // Default light mode
+  int lightModeNight = 1; // Default light mode
+
   @override
   void initState() {
     super.initState();
     // Initialize controllers with current values from variables.dart
     _dayTempController.text = dayTemperature.toString();
     _nightTempController.text = nightTemperature.toString();
-    _dayHumidityController.text =
-        dayHumidity.toString(); // Using day humidity for the controller
-    _nightHumidityController.text =
-        nightHumidity.toString(); // Using night humidity for the controller
-    _dayCO2Controller.text =
-        dayCO2.toString(); // Using day CO2 for the controller
-    _nightCO2Controller.text =
-        nightCO2.toString(); // Using night CO2 for the controller
+    _dayHumidityController.text = dayHumidity.toString();
+    _nightHumidityController.text = nightHumidity.toString();
+    _dayCO2Controller.text = dayCO2.toString();
+    _nightCO2Controller.text = nightCO2.toString();
+    _dayLightIntensityController.text = dayLightIntensity.toString();
+    _nightLightIntensityController.text = nightLightIntensity.toString();
   }
 
   @override
@@ -51,7 +59,32 @@ class SetpointPageState extends State<SetpointPage> {
     _nightHumidityController.dispose();
     _dayCO2Controller.dispose();
     _nightCO2Controller.dispose();
+    _dayLightIntensityController.dispose();
+    _nightLightIntensityController.dispose();
+
     super.dispose();
+  }
+
+  // Helper to get the current mode description string based on lightMode integer
+  String get currentDayModeDescription {
+    if (lightModeDay >= 1 && lightModeDay <= 5) {
+      return modeDescriptions[lightModeDay - 1];
+    } else if (lightModeDay == 6) {
+      return 'Manual';
+    } else {
+      return 'Unknown';
+    }
+  }
+
+  // Helper to get the current mode description string based on lightMode integer
+  String get currentNightModeDescription {
+    if (lightModeNight >= 1 && lightModeNight <= 5) {
+      return modeDescriptions[lightModeNight - 1];
+    } else if (lightModeNight == 6) {
+      return 'Manual';
+    } else {
+      return 'Unknown';
+    }
   }
 
   @override
@@ -216,63 +249,42 @@ class SetpointPageState extends State<SetpointPage> {
                         _nightTempController,
                       ),
                     ],
+
+                    // Humidity and CO₂ settings
                     if (selectedParameter == 'Humidity') ...[
-                      Align(
-                        alignment: Alignment.center,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildParameterCard(
-                              Icons.sunny,
-                              'Day Setpoint',
-                              '${dayHumidity.toStringAsFixed(1)} %',
-                            ),
-                            const SizedBox(width: 10),
-                            _buildParameterCard(
-                              Icons.nightlight,
-                              'Night Setpoint',
-                              '${nightHumidity.toStringAsFixed(1)} %',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Divider(thickness: 1),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Humidity Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color.fromARGB(255, 0, 0, 0),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildSetpointInputField(
-                        'Day Humidity (%)',
+                      _buildHumidityCO2Section(
+                        'Humidity',
                         _dayHumidityController,
-                      ),
-                      _buildSetpointInputField(
-                        'Night Humidity (%)',
                         _nightHumidityController,
                       ),
                     ],
+
                     if (selectedParameter == 'CO₂') ...[
+                      _buildHumidityCO2Section(
+                        'CO₂',
+                        _dayCO2Controller,
+                        _nightCO2Controller,
+                      ),
+                    ],
+
+                    if (selectedParameter == 'Light') ...[
                       Align(
                         alignment: Alignment.center,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _buildParameterCard(
+                            _buildLightCard(
                               Icons.sunny,
                               'Day Setpoint',
-                              '${dayCO2.toStringAsFixed(1)} ppm',
+                              dayLightMode,
+                              '${dayLightIntensity.toStringAsFixed(1)} LUX',
                             ),
                             const SizedBox(width: 10),
-                            _buildParameterCard(
+                            _buildLightCard(
                               Icons.nightlight,
                               'Night Setpoint',
-                              '${nightCO2.toStringAsFixed(1)} ppm',
+                              nightLightMode,
+                              '${nightLightIntensity.toStringAsFixed(1)} LUX',
                             ),
                           ],
                         ),
@@ -281,7 +293,7 @@ class SetpointPageState extends State<SetpointPage> {
                       const Divider(thickness: 1),
                       const SizedBox(height: 10),
                       const Text(
-                        'CO₂ Settings',
+                        'Day Light Settings',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -289,16 +301,214 @@ class SetpointPageState extends State<SetpointPage> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      _buildSetpointInputField(
-                        'Day CO₂ (ppm)',
-                        _dayCO2Controller,
+
+                      // Dropdown for Light Mode selection
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton2<String>(
+                          buttonStyleData: ButtonStyleData(
+                            width: screenWidth,
+                            padding: const EdgeInsets.only(left: 20, right: 20),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.transparent,
+                              border: Border.all(color: Colors.blue, width: 2),
+                            ),
+                          ),
+
+                          dropdownStyleData: DropdownStyleData(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+
+                          iconStyleData: const IconStyleData(
+                            icon: Icon(Icons.arrow_drop_down_rounded),
+                            iconSize: 30,
+                            openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
+                            iconEnabledColor: Colors.blue,
+                          ),
+
+                          value: currentDayModeDescription,
+                          onChanged: (String? newValue) {
+                            if (newValue == null) return;
+
+                            setState(() {
+                              if (newValue.startsWith('Mode ')) {
+                                // Extract the mode number from the string, e.g. "Mode 3: ..."
+                                final modeNumberString =
+                                    newValue.split(':')[0].split(' ')[1];
+                                lightModeDay =
+                                    int.tryParse(modeNumberString) ??
+                                    lightModeDay;
+                              } else if (newValue == 'Manual') {
+                                lightModeDay = 6;
+                              }
+                            });
+                          },
+                          items:
+                              modeDescriptions.map<DropdownMenuItem<String>>((
+                                String mode,
+                              ) {
+                                return DropdownMenuItem<String>(
+                                  value: mode,
+                                  child: Text(mode),
+                                );
+                              }).toList(),
+                        ),
                       ),
-                      _buildSetpointInputField(
-                        'Night CO₂ (ppm)',
-                        _nightCO2Controller,
+
+                      const SizedBox(height: 10),
+
+                      // Show light intensity for Mode 1-4 only
+                      if (lightModeDay != 5 && lightModeDay != 6) ...[
+                        _buildSetpointInputField(
+                          'Day Light Intensity (LUX)',
+                          _dayLightIntensityController,
+                        ),
+                      ],
+
+                      // Show sliders for Manual Mode
+                      if (lightModeDay == 6) ...[
+                        const SizedBox(height: 10),
+                        _buildSlider('PAR Light', parDayPWM, (newValue) {
+                          setState(() {
+                            parDayPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('Red Light', redDayPWM, (newValue) {
+                          setState(() {
+                            redDayPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('Blue Light', blueDayPWM, (newValue) {
+                          setState(() {
+                            blueDayPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('UV Light', uvDayPWM, (newValue) {
+                          setState(() {
+                            uvDayPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('IR Light', irDayPWM, (newValue) {
+                          setState(() {
+                            irDayPWM = newValue;
+                          });
+                        }),
+                      ],
+
+                      const SizedBox(height: 10),
+
+                      const Divider(thickness: 1),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Night Light Settings',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color.fromARGB(255, 0, 0, 0),
+                        ),
                       ),
+
+                      const SizedBox(height: 10),
+                      // Dropdown for Light Mode selection
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton2<String>(
+                          buttonStyleData: ButtonStyleData(
+                            width: screenWidth,
+                            padding: const EdgeInsets.only(left: 20, right: 20),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.transparent,
+                              border: Border.all(color: Colors.blue, width: 2),
+                            ),
+                          ),
+
+                          dropdownStyleData: DropdownStyleData(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+
+                          iconStyleData: const IconStyleData(
+                            icon: Icon(Icons.arrow_drop_down_rounded),
+                            iconSize: 30,
+                            openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
+                            iconEnabledColor: Colors.blue,
+                          ),
+
+                          value: currentNightModeDescription,
+                          onChanged: (String? newValue) {
+                            if (newValue == null) return;
+
+                            setState(() {
+                              if (newValue.startsWith('Mode ')) {
+                                // Extract the mode number from the string, e.g. "Mode 3: ..."
+                                final modeNumberString =
+                                    newValue.split(':')[0].split(' ')[1];
+                                lightModeNight =
+                                    int.tryParse(modeNumberString) ??
+                                    lightModeNight;
+                              } else if (newValue == 'Manual') {
+                                lightModeNight = 6;
+                              }
+                            });
+                          },
+                          items:
+                              modeDescriptions.map<DropdownMenuItem<String>>((
+                                String mode,
+                              ) {
+                                return DropdownMenuItem<String>(
+                                  value: mode,
+                                  child: Text(mode),
+                                );
+                              }).toList(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Show light intensity for Mode 1-4 only
+                      if (lightModeNight != 5 && lightModeNight != 6) ...[
+                        _buildSetpointInputField(
+                          'Night Light Intensity (LUX)',
+                          _nightLightIntensityController,
+                        ),
+                      ],
+
+                      // Show sliders for Manual Mode
+                      if (lightModeNight == 6) ...[
+                        const SizedBox(height: 10),
+                        const SizedBox(height: 10),
+                        _buildSlider('PAR Light', parNightPWM, (newValue) {
+                          setState(() {
+                            parNightPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('Red Light', redNightPWM, (newValue) {
+                          setState(() {
+                            redNightPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('Blue Light', blueNightPWM, (newValue) {
+                          setState(() {
+                            blueNightPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('UV Light', uvNightPWM, (newValue) {
+                          setState(() {
+                            uvNightPWM = newValue;
+                          });
+                        }),
+                        _buildSlider('IR Light', irNightPWM, (newValue) {
+                          setState(() {
+                            irNightPWM = newValue;
+                          });
+                        }),
+                      ],
+                      const SizedBox(height: 10),
                     ],
-                    const SizedBox(height: 20),
+
                     ElevatedButton(
                       onPressed: () {
                         if (selectedParameter == 'Temperature') {
@@ -307,10 +517,14 @@ class SetpointPageState extends State<SetpointPage> {
                           _saveHumiditySetpoints();
                         } else if (selectedParameter == 'CO₂') {
                           _saveCO2Setpoints();
+                        } else if (selectedParameter == 'Light') {
+                          _saveLightSetpoints();
                         }
                       },
                       child: const Text("Save Setpoints"),
                     ),
+
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -338,15 +552,43 @@ class SetpointPageState extends State<SetpointPage> {
     );
   }
 
+  Widget _buildSlider(
+    String label,
+    double value,
+    ValueChanged<double> onChanged,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label),
+        Slider(
+          value: value,
+          min: 0,
+          max: 100,
+          divisions: 100,
+          label: '${value.toStringAsFixed(0)}%',
+          onChanged: (double newValue) {
+            setState(() {
+              onChanged(
+                newValue,
+              ); // This will update the respective state value
+            });
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildParameterCard(IconData icon, String label, String value) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double screenHeight = MediaQuery.of(context).size.height;
 
     return SizedBox(
       width: screenWidth * 0.4, // Same width for both cards
-      height: screenHeight * 0.15, // Same height for both cards
+      height: screenHeight * 0.17, // Same height for both cards
       child: Card(
         elevation: 2,
+        color: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -366,7 +608,72 @@ class SetpointPageState extends State<SetpointPage> {
               Text(
                 value,
                 style: const TextStyle(
-                  fontSize: 20,
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLightCard(
+    IconData icon,
+    String label,
+    String mode,
+    String value,
+  ) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double screenHeight = MediaQuery.of(context).size.height;
+
+    return SizedBox(
+      width: screenWidth * 0.4, // Same width for both cards
+      height: screenHeight * 0.19, // Same height for both cards
+      child: Card(
+        elevation: 2,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: Colors.blue),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              // Container for Mode
+              Container(
+                margin: const EdgeInsets.all(3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  mode,
+                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                ),
+              ),
+
+              // SizedBox for Setpoint
+              const SizedBox(height: 4),
+              Text(
+                mode == "Mode 5"
+                    ? 'Lights Off'
+                    : mode == 'Manual'
+                    ? 'Custom'
+                    : value,
+                style: const TextStyle(
+                  fontSize: 14,
                   fontWeight: FontWeight.normal,
                 ),
               ),
@@ -438,6 +745,45 @@ class SetpointPageState extends State<SetpointPage> {
     );
   }
 
+  void _saveLightSetpoints() {
+    setState(() {
+      if (lightModeDay == 6) {
+        dayLightMode = 'Manual';
+      } else {
+        dayLightMode = 'Mode $lightModeDay'; // Store selected light mode
+      }
+
+      if (lightModeNight == 6) {
+        nightLightMode = 'Manual';
+      } else {
+        nightLightMode = 'Mode $lightModeNight'; // Store selected light mode
+      }
+
+      // Update Day Light Intensity
+      if (lightModeDay != 5 && lightModeDay != 6) {
+        // Update Day Intensity for Modes 1-4
+        dayLightIntensity = double.tryParse(_dayLightIntensityController.text)!;
+      } else if (lightModeDay == 5) {
+        // If Mode 5 is selected, all lights are off
+        dayLightIntensity = 0;
+      }
+
+      // Update Night Light Intensity
+      if (lightModeNight != 5 && lightModeNight != 6) {
+        // Update Day / Light Intensity for Modes 1-4
+        nightLightIntensity =
+            double.tryParse(_nightLightIntensityController.text)!;
+      } else if (lightModeNight == 5) {
+        // If Mode 5 is selected, all lights are off
+        nightLightIntensity = 0;
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Light setpoints updated successfully!')),
+    );
+  }
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -452,6 +798,56 @@ class SetpointPageState extends State<SetpointPage> {
               ),
             ],
           ),
+    );
+  }
+
+  Widget _buildHumidityCO2Section(
+    String label,
+    TextEditingController dayController,
+    TextEditingController nightController,
+  ) {
+    return Column(
+      children: [
+        Align(
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildParameterCard(
+                Icons.sunny,
+                'Day Setpoint',
+                '${dayController.text} ${label == 'CO₂' ? 'ppm' : '%'}',
+              ),
+              const SizedBox(width: 10),
+              _buildParameterCard(
+                Icons.nightlight,
+                'Night Setpoint',
+                '${nightController.text} ${label == 'CO₂' ? 'ppm' : '%'}',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Divider(thickness: 1),
+        const SizedBox(height: 10),
+        Text(
+          '$label Settings',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color.fromARGB(255, 0, 0, 0),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _buildSetpointInputField(
+          'Day $label (${label == 'CO₂' ? 'ppm' : '%'})',
+          dayController,
+        ),
+        _buildSetpointInputField(
+          'Night $label (${label == 'CO₂' ? 'ppm' : '%'})',
+          nightController,
+        ),
+      ],
     );
   }
 }
