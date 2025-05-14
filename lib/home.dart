@@ -122,7 +122,7 @@ class HomePage extends StatelessWidget {
                             mainAxisSpacing: screenHeight * 0.02,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            childAspectRatio: screenWidth * 3 / screenHeight,
+                            childAspectRatio: screenWidth * 2.69 / screenHeight,
                             children: [
                               SensorCard(
                                 title: 'Temperature',
@@ -418,7 +418,7 @@ class SensorCard extends StatelessWidget {
               ),
             ],
           ),
-          const Spacer(),
+          const Divider(thickness: 1),
           Text(
             'Setpoint: $setpoint',
             style: TextStyle(fontSize: setpointFontSize, color: Colors.black54),

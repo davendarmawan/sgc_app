@@ -12,7 +12,7 @@ void main() {
   // Set status bar color to transparent
   SystemChrome.setSystemUIOverlayStyle(
     SystemUiOverlayStyle(
-      systemNavigationBarColor: const Color.fromARGB(255, 222, 222, 222),
+      systemNavigationBarColor: const Color.fromARGB(255, 255, 255, 255),
       systemNavigationBarIconBrightness: Brightness.dark,
       statusBarIconBrightness: Brightness.dark,
     ),
@@ -76,7 +76,7 @@ class HomeScreenState extends State<HomeScreen> {
       body: _pages[_selectedIndex], // Show the corresponding page
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Color.fromRGBO(255, 255, 255, 0.9),
+          color: Color.fromRGBO(255, 255, 255, 1),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(0),
             topRight: Radius.circular(0),

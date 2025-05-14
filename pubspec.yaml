@@ -38,6 +38,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   fl_chart: ^1.0.0
   dropdown_button2: ^2.3.9
+  
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +50,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+  flutter_native_splash: ^2.4.6
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -62,6 +65,7 @@ flutter:
     - assets/image1.png
     - assets/image2.png
     - assets/image3.png
+    - assets/profile.png
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -97,3 +101,11 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_native_splash:
+  color: "#c4eafe"
+  image: assets/smartfarm_logo.png
+
+android_12:
+  image: assets/smartfarm_logo.png
+  color: "#c4eafe"
