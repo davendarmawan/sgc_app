@@ -1,4 +1,5 @@
 // File to store variables to the app data
+
 /* Home Menu Data */
 String temperature = '35.0';
 String humidity = '75.0';
