@@ -38,9 +38,10 @@ It is preferable to use Visual Studio Code. These are the steps to run Flutter a
 
 #### Expected Improvements
 - You should change the name (default: `Kadhan Dalilurahman` and institution (default: `ITB`) of the user, preferably on Change Password Menu (`change_pwd.dart`) and Device Settings (`dev_settings.dart`) by connecting to user data in database.
+- Change the Selected Device name on Night-Day Hour Settings, based on the selected device from Device Settings.
 - Delete print on Night-Day Hour Settings, because it is used for debugging purposes only.
-- Connect API to Edit Profile, Change Password, Night-Day Hour Settings, and Device Settings.
-- On Device Settings, make sure that approved devices **would not appear** on "Request Device Access" anymore and vice-versa.
+- Connect API and Database to Edit Profile, Change Password, Night-Day Hour Settings, and Device Settings.
+- On Device Settings, make sure that approved devices **would not appear** on "Request Device Access" anymore and vice-versa. Connect API and Database to determine approved devices and device request.
 
 ## Notification Features
 - Notifications are handled by `notifications_loader.dart` to read JSON file and `notifications.dart` for the visual appearance.
@@ -60,7 +61,8 @@ This is the example `notifications.json`:
 **Note:** all components `dateTime`, `header`, and `info` **should be filled**. Failure to do so causes the `notification.dart` to return Error and hence Notification Menu **will not load**.
 
 #### Expected Improvements
-- Connect API to the Notifications Menu.
+- Connect API and Database to the Notifications Menu.
+- Try to connect the Notifications to device's notification menu (to enable pop up notification to users).
 
 ## Login / Register Screen
 - Login is handled by `login.dart`. Register is handled by `register.dart`.
@@ -74,7 +76,7 @@ Password: password123
 ```
 
 #### Expected Improvements
-- Connect API to the Login / Register Menus.
+- Connect API and Database to the Login and Register Menus.
 
 ## Important Issues!
 - There is a **loophole** on the app. This happens when the user has no access to any devices / have not set their selected devices. This is hard to implement because there is no logic to determine user's approved and selected devices (as the app is not connected to the database). Hence, after login, the user (who may not have access) will go straight to Home Menu (`home.dart`).
