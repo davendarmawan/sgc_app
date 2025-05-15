@@ -37,7 +37,7 @@ It is preferable to use Visual Studio Code. These are the steps to run Flutter a
 - On Device Settings, the program can detect devices that have been approved. Approved devices are available on the "Change Device" menu, and those which haven't been approved are available on "Request Device Access" menu. You can simply add / remove List contents of `approvedDevices` and `requestedDevices` on `dev_settings.dart`.
 
 #### Expected Improvements
-- You should change the name (default: `Kadhan Dalilurahman` and institution (default: `ITB`) of the user, preferably on Change Password Menu (`change_pwd.dart`) and Device Settings (`dev_settings.dart`).
+- You should change the name (default: `Kadhan Dalilurahman` and institution (default: `ITB`) of the user, preferably on Change Password Menu (`change_pwd.dart`) and Device Settings (`dev_settings.dart`) by connecting to user data in database.
 - Delete print on Night-Day Hour Settings, because it is used for debugging purposes only.
 - Connect API to Edit Profile, Change Password, Night-Day Hour Settings, and Device Settings.
 - On Device Settings, make sure that approved devices **would not appear** on "Request Device Access" anymore and vice-versa.
