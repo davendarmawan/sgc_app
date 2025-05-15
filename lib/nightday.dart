@@ -92,7 +92,7 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
         ),
       ),
       body: Container(
-        width: double.infinity,
+        height: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -101,155 +101,157 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
             colors: [Color(0xFFF7FAFC), Color(0xFFC4EAFE)],
           ),
         ),
-        child: Column(
-          children: [
-            // Avatar and Device Info
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.blue,
-              child: CircleAvatar(
-                radius: 47,
-                backgroundImage: AssetImage(
-                  'assets/profile.png',
-                ), // Use your avatar image here
-              ),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Device 1',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const Text(
-              '#PGC - Test',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
-
-            // Day Start Time Picker with Sun Icon
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Day Start Time',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
-              ),
-            ),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () => _selectTime(context, false),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 15,
-                  horizontal: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wb_sunny, color: Colors.orange),
-                    const SizedBox(width: 15),
-                    Text(
-                      _formatTimeOfDay(_dayStartTime),
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                  ],
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              // Avatar and Device Info
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.blue,
+                child: CircleAvatar(
+                  radius: 47,
+                  backgroundImage: AssetImage(
+                    'assets/profile.png',
+                  ), // Use your avatar image here
                 ),
               ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Night Start Time Picker with Moon Icon
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Night Start Time',
-                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              const SizedBox(height: 10),
+              const Text(
+                'Selected Device:',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () => _selectTime(context, true),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 15,
-                  horizontal: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.nightlight, color: Colors.grey),
-                    const SizedBox(width: 15),
-                    Text(
-                      _formatTimeOfDay(_nightStartTime),
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                  ],
+              const Text(
+                'PGC - ITB',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 30),
+
+              // Day Start Time Picker with Sun Icon
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Day Start Time',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // Filled Button (Save)
-            SizedBox(
-              width: double.infinity,
-              height: 40,
-              child: FilledButton(
-                onPressed: _saveSettings,
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _selectTime(context, false),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 15,
+                    horizontal: 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wb_sunny, color: Colors.orange),
+                      const SizedBox(width: 15),
+                      Text(
+                        _formatTimeOfDay(_dayStartTime),
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                    ],
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.access_time, size: 20, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text(
-                      'Save Night-Day Hour Settings',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // Night Start Time Picker with Moon Icon
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Night Start Time',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                 ),
               ),
-            ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _selectTime(context, true),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 15,
+                    horizontal: 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.nightlight, color: Colors.grey),
+                      const SizedBox(width: 15),
+                      Text(
+                        _formatTimeOfDay(_nightStartTime),
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-            const SizedBox(height: 40),
+              const SizedBox(height: 30),
 
-            // SmartFarm Logo
-            Image.asset(
-              'assets/smartfarm_logo.png', // Replace with your actual logo asset path
-              width: 150,
-              height: 100,
-              fit: BoxFit.contain,
-            ),
-          ],
+              // Filled Button (Save)
+              SizedBox(
+                width: double.infinity,
+                height: 40,
+                child: FilledButton(
+                  onPressed: _saveSettings,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.access_time, size: 20, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        'Save Night-Day Hour Settings',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              // SmartFarm Logo
+              Image.asset(
+                'assets/smartfarm_logo.png', // Replace with your actual logo asset path
+                width: 150,
+                height: 100,
+                fit: BoxFit.contain,
+              ),
+            ],
+          ),
         ),
       ),
     );

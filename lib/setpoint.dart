@@ -92,7 +92,6 @@ class SetpointPageState extends State<SetpointPage> {
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final double screenHeight = MediaQuery.of(context).size.height;
 
     return Stack(
       children: [
@@ -119,7 +118,7 @@ class SetpointPageState extends State<SetpointPage> {
                         HoverCircleIcon(iconData: Icons.settings),
                         Image.asset(
                           'assets/smartfarm_logo.png',
-                          height: screenHeight * 0.07,
+                          height: 58,
                           errorBuilder:
                               (context, error, stackTrace) =>
                                   const Icon(Icons.image_not_supported),
@@ -615,12 +614,9 @@ class SetpointPageState extends State<SetpointPage> {
   }
 
   Widget _buildParameterCard(IconData icon, String label, String value) {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double screenHeight = MediaQuery.of(context).size.height;
-
     return SizedBox(
-      width: screenWidth * 0.4, // Same width for both cards
-      height: screenHeight * 0.17, // Same height for both cards
+      width: 160, // Same width for both cards
+      height: 160, // Same height for both cards
       child: Card(
         elevation: 2,
         color: Colors.white,
@@ -660,12 +656,9 @@ class SetpointPageState extends State<SetpointPage> {
     String mode,
     String value,
   ) {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double screenHeight = MediaQuery.of(context).size.height;
-
     return SizedBox(
-      width: screenWidth * 0.4, // Same width for both cards
-      height: screenHeight * 0.19, // Same height for both cards
+      width: 160, // Same width for both cards
+      height: 160, // Same height for both cards
       child: Card(
         elevation: 2,
         color: Colors.white,

@@ -39,7 +39,7 @@ class SpectrumPage extends StatelessWidget {
                         HoverCircleIcon(iconData: Icons.settings),
                         Image.asset(
                           'assets/smartfarm_logo.png',
-                          height: screenHeight * 0.07,
+                          height: 58,
                           errorBuilder:
                               (context, error, stackTrace) =>
                                   const Icon(Icons.image_not_supported),

@@ -1,9 +1,11 @@
 // settings.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'editprofile.dart'; // Import the EditProfilePage
 import 'change_pwd.dart'; // Import the ChangePasswordPage
 import 'nightday.dart';
 import 'dev_settings.dart';
+import 'login.dart'; // Import LoginPage for navigation after logout
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -138,8 +140,20 @@ class SettingsPage extends StatelessWidget {
                 Align(
                   alignment: Alignment.center,
                   child: TextButton(
-                    onPressed: () {
-                      // Handle Log Out action
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool(
+                        'remember_me',
+                        false,
+                      ); // Clear remember me flag
+
+                      if (!context.mounted) return;
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                        (Route<dynamic> route) => false,
+                      );
                     },
                     child: const Text(
                       'Log Out',

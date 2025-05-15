@@ -8,7 +8,6 @@ class CameraPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final double screenHeight = MediaQuery.of(context).size.height;
 
     return Stack(
       children: [
@@ -37,7 +36,7 @@ class CameraPage extends StatelessWidget {
                         HoverCircleIcon(iconData: Icons.settings),
                         Image.asset(
                           'assets/smartfarm_logo.png',
-                          height: screenHeight * 0.07,
+                          height: 58,
                           errorBuilder:
                               (context, error, stackTrace) =>
                                   const Icon(Icons.image_not_supported),

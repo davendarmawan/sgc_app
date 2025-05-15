@@ -9,7 +9,6 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final double screenHeight = MediaQuery.of(context).size.height;
 
     return Stack(
       children: [
@@ -37,7 +36,7 @@ class HomePage extends StatelessWidget {
                       HoverCircleIcon(iconData: Icons.settings),
                       Image.asset(
                         'assets/smartfarm_logo.png',
-                        height: screenHeight * 0.07,
+                        height: 58,
                         errorBuilder:
                             (context, error, stackTrace) =>
                                 const Icon(Icons.image_not_supported),
@@ -85,7 +84,7 @@ class HomePage extends StatelessWidget {
                             margin: EdgeInsets.symmetric(
                               vertical: screenWidth * 0.04,
                             ),
-                            height: screenHeight * 0.25,
+                            height: 190,
                             decoration: BoxDecoration(
                               color: Colors.grey[300],
                               borderRadius: BorderRadius.circular(12),
@@ -118,11 +117,11 @@ class HomePage extends StatelessWidget {
                           ),
                           GridView.count(
                             crossAxisCount: 2,
-                            crossAxisSpacing: screenWidth * 0.03,
-                            mainAxisSpacing: screenHeight * 0.02,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            childAspectRatio: screenWidth * 2.69 / screenHeight,
+                            childAspectRatio: 1.25,
                             children: [
                               SensorCard(
                                 title: 'Temperature',
@@ -159,7 +158,7 @@ class HomePage extends StatelessWidget {
                               ),
                             ],
                           ),
-                          SizedBox(height: screenHeight * 0.01),
+                          SizedBox(height: 25),
                         ],
                       ),
                     ),

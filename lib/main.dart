@@ -8,16 +8,23 @@ import 'setpoint.dart'; // Import SetpointPage
 import 'camera.dart'; // Import CameraPage
 import 'spectrum.dart'; // Import SpectrumPage
 
+import 'login.dart';
+
 void main() {
-  // Set status bar color to transparent
-  SystemChrome.setSystemUIOverlayStyle(
-    SystemUiOverlayStyle(
-      systemNavigationBarColor: const Color.fromARGB(255, 255, 255, 255),
-      systemNavigationBarIconBrightness: Brightness.dark,
-      statusBarIconBrightness: Brightness.dark,
-    ),
-  );
-  runApp(const SmartFarmApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
+    _,
+  ) {
+    // Set status bar color to transparent
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        systemNavigationBarColor: const Color.fromARGB(255, 255, 255, 255),
+        systemNavigationBarIconBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
+    runApp(const SmartFarmApp());
+  });
 }
 
 class SmartFarmApp extends StatelessWidget {
@@ -28,11 +35,11 @@ class SmartFarmApp extends StatelessWidget {
     return MaterialApp(
       title: 'SmartFarm',
       theme: ThemeData(
-        primaryColor: Colors.blue,
+        primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
         fontFamily: GoogleFonts.nunito().fontFamily,
       ),
-      home: const HomeScreen(), // Set HomeScreen as default screen
+      home: const LoginPage(), // Set HomeScreen as default screen
       debugShowCheckedModeBanner: false,
     );
   }
