@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'variables.dart'; // Import the variables file
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'settings.dart';
-import 'notifications.dart';
+import 'notifications_loader.dart';
 
 class SetpointPage extends StatefulWidget {
   const SetpointPage({super.key});
@@ -913,7 +913,9 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
           // Navigate to Notifications page
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const NotificationsPage()),
+            MaterialPageRoute(
+              builder: (context) => const NotificationsLoaderPage(),
+            ),
           );
         }
       },

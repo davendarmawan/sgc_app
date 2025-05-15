@@ -1,0 +1,32 @@
+[
+  {
+    "dateTime": "2025-01-24T14:30:00",
+    "header": "Your Program is Done",
+    "info": "The scheduled program has completed successfully."
+  },
+  {
+    "dateTime": "2025-01-24T09:15:00",
+    "header": "CO2 Intake isn't Functioning Properly",
+    "info": "Make sure the CO2 tube is not empty!"
+  },
+  {
+    "dateTime": "2025-01-24T09:10:00",
+    "header": "CO2 Absorption isn't Functioning Properly",
+    "info": "Make sure to replace the scrubber!"
+  },
+  {
+    "dateTime": "2024-12-04T08:00:00",
+    "header": "Device isn't Connected",
+    "info": "Please check the device connectivity."
+  },
+  {
+    "dateTime": "2024-12-04T09:00:00",
+    "header": "Device isn't Connected",
+    "info": "Please check the device connectivity."
+  },
+  {
+    "dateTime": "2025-12-04T10:00:00",
+    "header": "Device isn't Connected",
+    "info": "Please check the device connectivity."
+  }
+]

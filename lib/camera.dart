@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'settings.dart';
-import 'notifications.dart';
+import 'notifications_loader.dart';
 
 class CameraPage extends StatelessWidget {
   const CameraPage({super.key});
@@ -152,7 +152,9 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
           // Navigate to Notifications page
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const NotificationsPage()),
+            MaterialPageRoute(
+              builder: (context) => const NotificationsLoaderPage(),
+            ),
           );
         }
       },

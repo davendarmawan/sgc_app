@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'variables.dart'; // Import the variables.dart file containing data arrays and labels
 import 'settings.dart';
-import 'notifications.dart';
+import 'notifications_loader.dart';
 
 class GraphPage extends StatelessWidget {
   const GraphPage({super.key});
@@ -243,7 +243,9 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
           // Navigate to Notifications page
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const NotificationsPage()),
+            MaterialPageRoute(
+              builder: (context) => const NotificationsLoaderPage(),
+            ),
           );
         }
       },
