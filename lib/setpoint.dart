@@ -11,6 +11,55 @@ class SetpointPage extends StatefulWidget {
   SetpointPageState createState() => SetpointPageState();
 }
 
+// Custom thumb shape with blue outline
+class CustomThumbShape extends RoundSliderThumbShape {
+  final Color outlineColor;
+  final double outlineWidth;
+
+  const CustomThumbShape({
+    this.outlineColor = Colors.blue,
+    this.outlineWidth = 2.0,
+  });
+
+  @override
+  double get enabledThumbRadius => 12.0;
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final Canvas canvas = context.canvas;
+
+    // Draw the blue outline circle
+    final Paint outlinePaint =
+        Paint()
+          ..color = outlineColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = outlineWidth;
+
+    canvas.drawCircle(center, enabledThumbRadius, outlinePaint);
+
+    // Draw the white filled circle inside
+    final Paint fillPaint =
+        Paint()
+          ..color = sliderTheme.thumbColor ?? Colors.white
+          ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(center, enabledThumbRadius - outlineWidth, fillPaint);
+  }
+}
+
 class SetpointPageState extends State<SetpointPage> {
   String selectedParameter = 'Temperature';
 
@@ -315,27 +364,23 @@ class SetpointPageState extends State<SetpointPage> {
                               border: Border.all(color: Colors.blue, width: 2),
                             ),
                           ),
-
                           dropdownStyleData: DropdownStyleData(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-
                           iconStyleData: const IconStyleData(
                             icon: Icon(Icons.arrow_drop_down_rounded),
                             iconSize: 30,
                             openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
                             iconEnabledColor: Colors.blue,
                           ),
-
                           value: currentDayModeDescription,
                           onChanged: (String? newValue) {
                             if (newValue == null) return;
 
                             setState(() {
                               if (newValue.startsWith('Mode ')) {
-                                // Extract the mode number from the string, e.g. "Mode 3: ..."
                                 final modeNumberString =
                                     newValue.split(':')[0].split(' ')[1];
                                 lightModeDay =
@@ -368,34 +413,31 @@ class SetpointPageState extends State<SetpointPage> {
                         ),
                       ],
 
-                      // Show sliders for Manual Mode
+                      // Show sliders for Manual Mode inside one white container
                       if (lightModeDay == 6) ...[
                         const SizedBox(height: 10),
-                        _buildSlider('PAR Light', parDayPWM, (newValue) {
-                          setState(() {
+                        _buildSlidersGroup([
+                          _buildSlider('PAR Light', parDayPWM, (newValue) {
                             parDayPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('Red Light', redDayPWM, (newValue) {
-                          setState(() {
+                          }),
+                          _buildSlider('Red Light', redDayPWM, (newValue) {
                             redDayPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('Blue Light', blueDayPWM, (newValue) {
-                          setState(() {
+                          }),
+                          _buildSlider('Blue Light', blueDayPWM, (newValue) {
                             blueDayPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('UV Light', uvDayPWM, (newValue) {
-                          setState(() {
+                          }),
+                          _buildSlider('UV Light', uvDayPWM, (newValue) {
                             uvDayPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('IR Light', irDayPWM, (newValue) {
-                          setState(() {
-                            irDayPWM = newValue;
-                          });
-                        }),
+                          }),
+                          _buildSlider(
+                            'IR Light',
+                            irDayPWM,
+                            (newValue) {
+                              irDayPWM = newValue;
+                            },
+                            showDivider: false,
+                          ), // No divider after last slider
+                        ]),
                       ],
 
                       const SizedBox(height: 10),
@@ -424,27 +466,23 @@ class SetpointPageState extends State<SetpointPage> {
                               border: Border.all(color: Colors.blue, width: 2),
                             ),
                           ),
-
                           dropdownStyleData: DropdownStyleData(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-
                           iconStyleData: const IconStyleData(
                             icon: Icon(Icons.arrow_drop_down_rounded),
                             iconSize: 30,
                             openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
                             iconEnabledColor: Colors.blue,
                           ),
-
                           value: currentNightModeDescription,
                           onChanged: (String? newValue) {
                             if (newValue == null) return;
 
                             setState(() {
                               if (newValue.startsWith('Mode ')) {
-                                // Extract the mode number from the string, e.g. "Mode 3: ..."
                                 final modeNumberString =
                                     newValue.split(':')[0].split(' ')[1];
                                 lightModeNight =
@@ -477,44 +515,37 @@ class SetpointPageState extends State<SetpointPage> {
                         ),
                       ],
 
-                      // Show sliders for Manual Mode
+                      // Show sliders for Manual Mode inside one white container
                       if (lightModeNight == 6) ...[
                         const SizedBox(height: 10),
-                        const SizedBox(height: 10),
-                        _buildSlider('PAR Light', parNightPWM, (newValue) {
-                          setState(() {
-                            parNightPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('Red Light', redNightPWM, (newValue) {
-                          setState(() {
-                            redNightPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('Blue Light', blueNightPWM, (newValue) {
-                          setState(() {
-                            blueNightPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('UV Light', uvNightPWM, (newValue) {
-                          setState(() {
-                            uvNightPWM = newValue;
-                          });
-                        }),
-                        _buildSlider('IR Light', irNightPWM, (newValue) {
-                          setState(() {
-                            irNightPWM = newValue;
-                          });
-                        }),
+                        _buildSlidersGroup([
+                          _buildSlider('PAR Light', parDayPWM, (newValue) {
+                            parDayPWM = newValue;
+                          }),
+                          _buildSlider('Red Light', redDayPWM, (newValue) {
+                            redDayPWM = newValue;
+                          }),
+                          _buildSlider('Blue Light', blueDayPWM, (newValue) {
+                            blueDayPWM = newValue;
+                          }),
+                          _buildSlider('UV Light', uvDayPWM, (newValue) {
+                            uvDayPWM = newValue;
+                          }),
+                          _buildSlider(
+                            'IR Light',
+                            irDayPWM,
+                            (newValue) {
+                              irDayPWM = newValue;
+                            },
+                            showDivider: false,
+                          ), // No divider after last slider
+                        ]),
                       ],
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 15),
                     ],
 
                     SizedBox(
-                      width:
-                          MediaQuery.of(
-                            context,
-                          ).size.width, // Set the width to the screen's width
+                      width: MediaQuery.of(context).size.width,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.blue,
@@ -535,17 +566,10 @@ class SetpointPageState extends State<SetpointPage> {
                           }
                         },
                         child: Row(
-                          mainAxisSize:
-                              MainAxisSize
-                                  .min, // Ensure the row only takes as much space as needed
+                          mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Icon(
-                              Icons.save_as,
-                              color: Colors.white,
-                            ), // Save icon on the left
-                            SizedBox(
-                              width: 8,
-                            ), // Add some space between the icon and text
+                            Icon(Icons.save_as, color: Colors.white),
+                            SizedBox(width: 8),
                             Text(
                               "Save Setpoints",
                               style: TextStyle(
@@ -577,7 +601,7 @@ class SetpointPageState extends State<SetpointPage> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: TextField(
         controller: controller,
-        keyboardType: TextInputType.numberWithOptions(decimal: true),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -586,30 +610,79 @@ class SetpointPageState extends State<SetpointPage> {
     );
   }
 
+  Widget _buildSlidersGroup(List<Widget> sliders) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Container(
+          width: constraints.maxWidth, // Use full available width
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white, // White background behind all sliders
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(children: sliders),
+        );
+      },
+    );
+  }
+
   Widget _buildSlider(
     String label,
     double value,
-    ValueChanged<double> onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label),
-        Slider(
-          value: value,
-          min: 0,
-          max: 100,
-          divisions: 100,
-          label: '${value.toStringAsFixed(0)}%',
-          onChanged: (double newValue) {
-            setState(() {
-              onChanged(
-                newValue,
-              ); // This will update the respective state value
-            });
-          },
-        ),
-      ],
+    ValueChanged<double> onChanged, {
+    bool showDivider = true,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.black)),
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: Colors.blue,
+                inactiveTrackColor: Color.fromRGBO(33, 150, 243, 0.3),
+                trackHeight: 15.0,
+                thumbColor: const Color.fromARGB(255, 255, 255, 255),
+                overlayColor: Color.fromRGBO(33, 150, 243, 0.2),
+                thumbShape: const CustomThumbShape(
+                  outlineColor: Colors.blue,
+                  outlineWidth: 2.0,
+                ),
+                overlayShape: const RoundSliderOverlayShape(
+                  overlayRadius: 24.0,
+                ),
+                valueIndicatorColor: Colors.blue,
+                valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+              ),
+              child: SizedBox(
+                width: constraints.maxWidth,
+                child: Slider(
+                  value: value,
+                  min: 0,
+                  max: 100,
+                  divisions: 100,
+                  label: '${value.toStringAsFixed(0)}%',
+                  onChanged: (double newValue) {
+                    setState(() {
+                      onChanged(newValue);
+                    });
+                  },
+                ),
+              ),
+            ),
+            if (showDivider)
+              const Divider(thickness: 1, height: 20, color: Colors.grey),
+          ],
+        );
+      },
     );
   }
 
@@ -688,7 +761,7 @@ class SetpointPageState extends State<SetpointPage> {
                 ),
                 child: Text(
                   mode,
-                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                  style: const TextStyle(color: Colors.black54, fontSize: 12),
                 ),
               ),
 
@@ -798,7 +871,7 @@ class SetpointPageState extends State<SetpointPage> {
 
       // Update Night Light Intensity
       if (lightModeNight != 5 && lightModeNight != 6) {
-        // Update Day / Light Intensity for Modes 1-4
+        // Update Night Intensity for Modes 1-4
         nightLightIntensity =
             double.tryParse(_nightLightIntensityController.text)!;
       } else if (lightModeNight == 5) {
