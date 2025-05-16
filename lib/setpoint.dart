@@ -25,6 +25,7 @@ class CustomThumbShape extends RoundSliderThumbShape {
   double get enabledThumbRadius => 12.0;
 
   @override
+  @override
   void paint(
     PaintingContext context,
     Offset center, {
@@ -41,22 +42,26 @@ class CustomThumbShape extends RoundSliderThumbShape {
   }) {
     final Canvas canvas = context.canvas;
 
-    // Draw the blue outline circle
+    // Draw the white filled circle inside (full radius)
+    final Paint fillPaint =
+        Paint()
+          ..color = sliderTheme.thumbColor ?? Colors.white
+          ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(center, enabledThumbRadius, fillPaint);
+
+    // Draw the blue outline circle (stroke centered on radius - half stroke width)
     final Paint outlinePaint =
         Paint()
           ..color = outlineColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = outlineWidth;
 
-    canvas.drawCircle(center, enabledThumbRadius, outlinePaint);
-
-    // Draw the white filled circle inside
-    final Paint fillPaint =
-        Paint()
-          ..color = sliderTheme.thumbColor ?? Colors.white
-          ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(center, enabledThumbRadius - outlineWidth, fillPaint);
+    canvas.drawCircle(
+      center,
+      enabledThumbRadius - outlineWidth / 2,
+      outlinePaint,
+    );
   }
 }
 
