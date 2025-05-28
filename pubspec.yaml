@@ -87,7 +87,6 @@ flutter:
     - assets/image3.png
     - assets/profile.png
     - assets/no_notification.png
-    - assets/routine.svg
 
     # JSON Data
     - assets/json/notifications.json
