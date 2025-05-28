@@ -1,10 +1,31 @@
 import 'package:flutter/material.dart';
 import 'variables.dart';
 import 'settings.dart';
+import 'nightday.dart';
 import 'notifications_loader.dart';
+import 'package:carousel_slider_plus/carousel_slider_plus.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _currentCarouselIndex = 0;
+
+  final List<String> cameraPreviewImages = [
+    'assets/image1.png',
+    'assets/image2.png',
+    'assets/image3.png',
+  ];
+
+  final List<String> cameraLabels = [
+    'Top Camera',
+    'Bottom Camera',
+    'User Camera',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -84,35 +105,117 @@ class HomePage extends StatelessWidget {
                             margin: EdgeInsets.symmetric(
                               vertical: screenWidth * 0.04,
                             ),
-                            height: 190,
+                            height: 212, // increased height to accommodate dots
                             decoration: BoxDecoration(
-                              color: Colors.grey[300],
                               borderRadius: BorderRadius.circular(12),
-                              image: const DecorationImage(
-                                image: AssetImage('assets/plant_preview.png'),
-                                fit: BoxFit.cover,
-                              ),
                             ),
-                            child: Align(
-                              alignment: Alignment.topRight,
-                              child: Container(
-                                margin: const EdgeInsets.all(8),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black45,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'Camera Preview',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      CarouselSlider(
+                                        options: CarouselOptions(
+                                          height: 190,
+                                          viewportFraction: 1.0,
+                                          autoPlay: false,
+                                          autoPlayInterval: const Duration(
+                                            seconds: 3,
+                                          ),
+                                          enlargeCenterPage: false,
+                                          enableInfiniteScroll: true,
+                                          onPageChanged: (index, reason) {
+                                            setState(() {
+                                              _currentCarouselIndex = index;
+                                            });
+                                          },
+                                        ),
+                                        items:
+                                            cameraPreviewImages.asMap().entries.map((
+                                              entry,
+                                            ) {
+                                              int index = entry.key;
+                                              String imagePath = entry.value;
+                                              return Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 3.0,
+                                                    ),
+                                                child: ClipRRect(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  child: Stack(
+                                                    children: [
+                                                      Image.asset(
+                                                        imagePath,
+                                                        fit: BoxFit.cover,
+                                                        width: double.infinity,
+                                                      ),
+                                                      Positioned(
+                                                        top: 8,
+                                                        right: 8,
+                                                        child: Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 8,
+                                                                vertical: 4,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color:
+                                                                Colors.black45,
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            cameraLabels[index],
+                                                            style:
+                                                                const TextStyle(
+                                                                  color:
+                                                                      Colors
+                                                                          .white,
+                                                                  fontSize: 12,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children:
+                                      cameraPreviewImages.asMap().entries.map((
+                                        entry,
+                                      ) {
+                                        return GestureDetector(
+                                          child: Container(
+                                            width: 8.0,
+                                            height: 8.0,
+                                            margin: const EdgeInsets.symmetric(
+                                              horizontal: 4.0,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color:
+                                                  _currentCarouselIndex ==
+                                                          entry.key
+                                                      ? Colors.blueAccent
+                                                      : Colors.grey[300],
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                ),
+                              ],
                             ),
                           ),
                           GridView.count(
@@ -158,7 +261,49 @@ class HomePage extends StatelessWidget {
                               ),
                             ],
                           ),
-                          SizedBox(height: 25),
+                          const SizedBox(height: 25),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 40,
+                            child: FilledButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) =>
+                                            const NightDaySettingsPage(),
+                                  ),
+                                );
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Night / Day Hour Settings',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 25),
                         ],
                       ),
                     ),
@@ -191,7 +336,7 @@ class HomePage extends StatelessWidget {
       );
     } else {
       return IconDataAndColor(
-        iconData: Icons.nights_stay,
+        iconData: Icons.dark_mode,
         iconColor: const Color.fromARGB(255, 83, 83, 83),
       );
     }
@@ -222,11 +367,11 @@ class HomePage extends StatelessWidget {
       // Nighttime values
       switch (sensor) {
         case 'temperature':
-          return '${dayTemperature.toString()} °C';
+          return '${nightTemperature.toString()} °C';
         case 'humidity':
-          return '${dayHumidity.toString()} %';
+          return '${nightHumidity.toString()} %';
         case 'co2':
-          return '${dayCO2.toString()} ppm';
+          return '${nightCO2.toString()} ppm';
         case 'light':
           if (nightLightMode == 'Manual') {
             return 'Custom';

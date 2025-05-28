@@ -199,7 +199,7 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.nightlight, color: Colors.grey),
+                      const Icon(Icons.dark_mode, color: Color(0xFF90A4AE)),
                       const SizedBox(width: 15),
                       Text(
                         _formatTimeOfDay(_nightStartTime),
@@ -227,7 +227,7 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.access_time, size: 20, color: Colors.white),
+                      Icon(Icons.save, size: 20, color: Colors.white),
                       SizedBox(width: 8),
                       Text(
                         'Save Night-Day Hour Settings',

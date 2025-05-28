@@ -276,7 +276,7 @@ class SetpointPageState extends State<SetpointPage> {
                             ),
                             const SizedBox(width: 10),
                             _buildParameterCard(
-                              Icons.nightlight,
+                              Icons.dark_mode,
                               'Night Setpoint',
                               '${nightTemperature.toStringAsFixed(1)} °C',
                             ),
@@ -336,7 +336,7 @@ class SetpointPageState extends State<SetpointPage> {
                             ),
                             const SizedBox(width: 10),
                             _buildLightCard(
-                              Icons.nightlight,
+                              Icons.dark_mode,
                               'Night Setpoint',
                               nightLightMode,
                               '${nightLightIntensity.toStringAsFixed(1)} LUX',
@@ -422,26 +422,62 @@ class SetpointPageState extends State<SetpointPage> {
                       if (lightModeDay == 6) ...[
                         const SizedBox(height: 10),
                         _buildSlidersGroup([
-                          _buildSlider('PAR Light', parDayPWM, (newValue) {
-                            parDayPWM = newValue;
-                          }),
-                          _buildSlider('Red Light', redDayPWM, (newValue) {
-                            redDayPWM = newValue;
-                          }),
-                          _buildSlider('Blue Light', blueDayPWM, (newValue) {
-                            blueDayPWM = newValue;
-                          }),
-                          _buildSlider('UV Light', uvDayPWM, (newValue) {
-                            uvDayPWM = newValue;
-                          }),
+                          _buildSlider(
+                            'PAR Light',
+                            parDayPWM,
+                            (newValue) {
+                              parDayPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFFFFA726,
+                            ), // Soothing Orange
+                            outlineColor: const Color(0xFFFFA726),
+                          ),
+                          _buildSlider(
+                            'Red Light',
+                            redDayPWM,
+                            (newValue) {
+                              redDayPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFFE53935,
+                            ), // Soothing Red
+                            outlineColor: const Color(0xFFE53935),
+                          ),
+                          _buildSlider(
+                            'Blue Light',
+                            blueDayPWM,
+                            (newValue) {
+                              blueDayPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFF42A5F5,
+                            ), // Blue (keep)
+                            outlineColor: const Color(0xFF42A5F5),
+                          ),
+                          _buildSlider(
+                            'UV Light',
+                            uvDayPWM,
+                            (newValue) {
+                              uvDayPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFF7E57C2,
+                            ), // Soothing Violet
+                            outlineColor: const Color(0xFF7E57C2),
+                          ),
                           _buildSlider(
                             'IR Light',
                             irDayPWM,
                             (newValue) {
                               irDayPWM = newValue;
                             },
+                            activeTrackColor: const Color(
+                              0xFFFF8A80,
+                            ), // Light Red
+                            outlineColor: const Color(0xFFFF8A80),
                             showDivider: false,
-                          ), // No divider after last slider
+                          ),
                         ]),
                       ],
 
@@ -524,26 +560,62 @@ class SetpointPageState extends State<SetpointPage> {
                       if (lightModeNight == 6) ...[
                         const SizedBox(height: 10),
                         _buildSlidersGroup([
-                          _buildSlider('PAR Light', parDayPWM, (newValue) {
-                            parDayPWM = newValue;
-                          }),
-                          _buildSlider('Red Light', redDayPWM, (newValue) {
-                            redDayPWM = newValue;
-                          }),
-                          _buildSlider('Blue Light', blueDayPWM, (newValue) {
-                            blueDayPWM = newValue;
-                          }),
-                          _buildSlider('UV Light', uvDayPWM, (newValue) {
-                            uvDayPWM = newValue;
-                          }),
+                          _buildSlider(
+                            'PAR Light',
+                            parNightPWM,
+                            (newValue) {
+                              parNightPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFFFFA726,
+                            ), // Soothing Orange
+                            outlineColor: const Color(0xFFFFA726),
+                          ),
+                          _buildSlider(
+                            'Red Light',
+                            redNightPWM,
+                            (newValue) {
+                              redNightPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFFE53935,
+                            ), // Soothing Red
+                            outlineColor: const Color(0xFFE53935),
+                          ),
+                          _buildSlider(
+                            'Blue Light',
+                            blueNightPWM,
+                            (newValue) {
+                              blueNightPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFF42A5F5,
+                            ), // Blue (keep)
+                            outlineColor: const Color(0xFF42A5F5),
+                          ),
+                          _buildSlider(
+                            'UV Light',
+                            uvNightPWM,
+                            (newValue) {
+                              uvNightPWM = newValue;
+                            },
+                            activeTrackColor: const Color(
+                              0xFF7E57C2,
+                            ), // Soothing Violet
+                            outlineColor: const Color(0xFF7E57C2),
+                          ),
                           _buildSlider(
                             'IR Light',
-                            irDayPWM,
+                            irNightPWM,
                             (newValue) {
-                              irDayPWM = newValue;
+                              irNightPWM = newValue;
                             },
+                            activeTrackColor: const Color(
+                              0xFFFF8A80,
+                            ), // Light Red
+                            outlineColor: const Color(0xFFFF8A80),
                             showDivider: false,
-                          ), // No divider after last slider
+                          ),
                         ]),
                       ],
                       const SizedBox(height: 15),
@@ -609,7 +681,15 @@ class SetpointPageState extends State<SetpointPage> {
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: InputDecoration(
           labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          labelStyle: const TextStyle(color: Colors.black),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.blue),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.blue, width: 2),
+          ),
         ),
       ),
     );
@@ -643,6 +723,8 @@ class SetpointPageState extends State<SetpointPage> {
     double value,
     ValueChanged<double> onChanged, {
     bool showDivider = true,
+    Color activeTrackColor = Colors.blue,
+    Color outlineColor = Colors.blue,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -652,19 +734,21 @@ class SetpointPageState extends State<SetpointPage> {
             Text(label, style: const TextStyle(color: Colors.black)),
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: Colors.blue,
-                inactiveTrackColor: Color.fromRGBO(33, 150, 243, 0.3),
+                activeTrackColor: activeTrackColor,
+                inactiveTrackColor: activeTrackColor.withAlpha(
+                  (0.3 * 255).toInt(),
+                ),
                 trackHeight: 15.0,
-                thumbColor: const Color.fromARGB(255, 255, 255, 255),
-                overlayColor: Color.fromRGBO(33, 150, 243, 0.2),
-                thumbShape: const CustomThumbShape(
-                  outlineColor: Colors.blue,
+                thumbColor: Colors.white,
+                overlayColor: activeTrackColor.withAlpha((0.2 * 255).toInt()),
+                thumbShape: CustomThumbShape(
+                  outlineColor: outlineColor,
                   outlineWidth: 2.0,
                 ),
                 overlayShape: const RoundSliderOverlayShape(
                   overlayRadius: 24.0,
                 ),
-                valueIndicatorColor: Colors.blue,
+                valueIndicatorColor: activeTrackColor,
                 valueIndicatorTextStyle: const TextStyle(color: Colors.white),
               ),
               child: SizedBox(
@@ -692,6 +776,15 @@ class SetpointPageState extends State<SetpointPage> {
   }
 
   Widget _buildParameterCard(IconData icon, String label, String value) {
+    Color iconColor;
+    if (icon == Icons.sunny) {
+      iconColor = const Color(0xFFFFA726); // Orange
+    } else if (icon == Icons.dark_mode) {
+      iconColor = const Color(0xFF90A4AE); // Moon color (soft blue-gray)
+    } else {
+      iconColor = Colors.blue;
+    }
+
     return SizedBox(
       width: 160, // Same width for both cards
       height: 160, // Same height for both cards
@@ -704,7 +797,7 @@ class SetpointPageState extends State<SetpointPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 40, color: Colors.blue),
+              Icon(icon, size: 40, color: iconColor),
               const SizedBox(height: 8),
               Text(
                 label,
@@ -734,6 +827,15 @@ class SetpointPageState extends State<SetpointPage> {
     String mode,
     String value,
   ) {
+    Color iconColor;
+    if (icon == Icons.sunny) {
+      iconColor = const Color(0xFFFFA726); // Orange
+    } else if (icon == Icons.dark_mode) {
+      iconColor = const Color(0xFF90A4AE); // Moon color (soft blue-gray)
+    } else {
+      iconColor = Colors.blue;
+    }
+
     return SizedBox(
       width: 160, // Same width for both cards
       height: 160, // Same height for both cards
@@ -746,7 +848,7 @@ class SetpointPageState extends State<SetpointPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 40, color: Colors.blue),
+              Icon(icon, size: 40, color: iconColor),
               const SizedBox(height: 8),
               Text(
                 label,
@@ -791,6 +893,13 @@ class SetpointPageState extends State<SetpointPage> {
   }
 
   void _saveTemperatureSetpoints() {
+    if (_dayTempController.text.isEmpty || _nightTempController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all temperature fields.')),
+      );
+      return;
+    }
+
     final double? newDayTemp = double.tryParse(_dayTempController.text);
     final double? newNightTemp = double.tryParse(_nightTempController.text);
 
@@ -812,6 +921,14 @@ class SetpointPageState extends State<SetpointPage> {
   }
 
   void _saveHumiditySetpoints() {
+    if (_dayHumidityController.text.isEmpty ||
+        _nightHumidityController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all humidity fields.')),
+      );
+      return;
+    }
+
     final double? newDayHumidity = double.tryParse(_dayHumidityController.text);
     final double? newNightHumidity = double.tryParse(
       _nightHumidityController.text,
@@ -833,11 +950,18 @@ class SetpointPageState extends State<SetpointPage> {
   }
 
   void _saveCO2Setpoints() {
+    if (_dayCO2Controller.text.isEmpty || _nightCO2Controller.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all CO₂ fields.')),
+      );
+      return;
+    }
+
     final double? newDayCO2 = double.tryParse(_dayCO2Controller.text);
     final double? newNightCO2 = double.tryParse(_nightCO2Controller.text);
 
     if (newDayCO2 == null || newNightCO2 == null) {
-      _showErrorDialog('Please enter valid numeric values for CO2 levels.');
+      _showErrorDialog('Please enter valid numeric values for CO₂ levels.');
       return;
     }
 
@@ -852,6 +976,20 @@ class SetpointPageState extends State<SetpointPage> {
   }
 
   void _saveLightSetpoints() {
+    if ((lightModeDay != 5 &&
+            lightModeDay != 6 &&
+            _dayLightIntensityController.text.isEmpty) ||
+        (lightModeNight != 5 &&
+            lightModeNight != 6 &&
+            _nightLightIntensityController.text.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all light intensity fields.'),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       if (lightModeDay == 6) {
         dayLightMode = 'Manual';
@@ -926,7 +1064,7 @@ class SetpointPageState extends State<SetpointPage> {
               ),
               const SizedBox(width: 10),
               _buildParameterCard(
-                Icons.nightlight,
+                Icons.dark_mode,
                 'Night Setpoint',
                 '${nightController.text} ${label == 'CO₂' ? 'ppm' : '%'}',
               ),

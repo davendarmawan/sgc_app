@@ -227,7 +227,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.lock, size: 20, color: Colors.white),
+                  Icon(Icons.key, size: 20, color: Colors.white),
                   SizedBox(width: 8),
                   Text(
                     'Change Password',

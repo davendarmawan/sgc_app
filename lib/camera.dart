@@ -72,6 +72,49 @@ class CameraPage extends StatelessWidget {
                       'User Camera',
                       'assets/image3.png', // Replace with your image path
                     ),
+                    const SizedBox(height: 20),
+
+                    // Take Photo Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 40,
+                      child: FilledButton(
+                        onPressed: () {
+                          // TODO: Implement take photo functionality
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Successfully took photos!'),
+                            ),
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.camera_alt,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Take Photo',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
                     const SizedBox(height: 20), // Add space at the very bottom
                   ],
                 ),
