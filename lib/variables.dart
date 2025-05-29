@@ -26,69 +26,51 @@ List<double> generateRandomData(
   return data;
 }
 
-// X-axis labels (time) - 24 hours, 30-minute intervals
-List<String> xLabels = [
-  "00:00",
-  "00:30",
-  "01:00",
-  "01:30",
-  "02:00",
-  "02:30",
-  "03:00",
-  "03:30",
-  "04:00",
-  "04:30",
-  "05:00",
-  "05:30",
-  "06:00",
-  "06:30",
-  "07:00",
-  "07:30",
-  "08:00",
-  "08:30",
-  "09:00",
-  "09:30",
-  "10:00",
-  "10:30",
-  "11:00",
-  "11:30",
-  "12:00",
-  "12:30",
-  "13:00",
-  "13:30",
-  "14:00",
-  "14:30",
-  "15:00",
-  "15:30",
-  "16:00",
-  "16:30",
-  "17:00",
-  "17:30",
-  "18:00",
-  "18:30",
-  "19:00",
-  "19:30",
-  "20:00",
-  "20:30",
-  "21:00",
-  "21:30",
-  "22:00",
-  "22:30",
-  "23:00",
-  "23:30",
-];
+// Helper function to generate xLabels for 24 hours with a given minute interval
+List<String> generateXLabels(int minuteInterval) {
+  List<String> labels = [];
+  for (int hour = 0; hour < 24; hour++) {
+    for (int minute = 0; minute < 60; minute += minuteInterval) {
+      labels.add(
+        '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+      );
+    }
+  }
+  return labels;
+}
 
-// Temperature data (Y-axis values) - Randomized for 48 data points
-List<double> temperatureValues = generateRandomData(48, 20.0, 45.0);
+const int _numberOfDataPointsForGraph = 24 * 60 ~/ 2; // 720 data points
 
-// Humidity data (Y-axis values) - Randomized for 48 data points
-List<double> humidityValues = generateRandomData(48, 30.0, 90.0);
+// X-axis labels (time) - 24 hours, 2-minute intervals
+List<String> xLabels = generateXLabels(2);
 
-// CO2 Level data (Y-axis values) - Randomized for 48 data points
-List<double> co2Values = generateRandomData(48, 300.0, 1000.0);
+// Temperature data (Y-axis values) - Randomized for 720 data points
+List<double> temperatureValues = generateRandomData(
+  _numberOfDataPointsForGraph,
+  20.0,
+  45.0,
+);
 
-// Average Light Intensity data (Y-axis values) - Randomized for 48 data points
-List<double> lightIntensityValues = generateRandomData(48, 100.0, 1500.0);
+// Humidity data (Y-axis values) - Randomized for 720 data points
+List<double> humidityValues = generateRandomData(
+  _numberOfDataPointsForGraph,
+  30.0,
+  90.0,
+);
+
+// CO2 Level data (Y-axis values) - Randomized for 720 data points
+List<double> co2Values = generateRandomData(
+  _numberOfDataPointsForGraph,
+  300.0,
+  1000.0,
+);
+
+// Average Light Intensity data (Y-axis values) - Randomized for 720 data points
+List<double> lightIntensityValues = generateRandomData(
+  _numberOfDataPointsForGraph,
+  100.0,
+  1500.0,
+);
 
 /* Spectrometer Menu Data */
 

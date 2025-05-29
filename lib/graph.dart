@@ -34,15 +34,9 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   Animation<Matrix4>? _graphResetMatrixAnimation;
   TransformationController? _controllerBeingReset;
 
-  // Configuration for dynamic interval calculation
-  // MODIFIED: Further reduced _maxLabelsToShowWhenZoomedOut for more space
-  static const int _maxLabelsToShowWhenZoomedOut =
-      6; // Target labels when fully zoomed out (was 10, then 7)
-  static const double _minScaleForDenseLabels =
-      1.0; // Scale at which zoomedOutInterval ideally applies
-  // MODIFIED: Further increased _maxScaleForIntervalOne to delay showing all labels
-  static const double _maxScaleForIntervalOne =
-      5.0; // Scale at or beyond which interval becomes 1.0 (was 2.5, then 4.0)
+  // This constant determines when dots appear on the line chart.
+  // If the X-axis interval is this value or less, dots are shown.
+  static const double _maxIntervalForDots = 3.0;
 
   @override
   void initState() {
@@ -55,8 +49,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     for (var title in _graphTitles) {
       _xAxisIntervals[title] = _calculateXAxisInterval(
         currentDataLength:
-            xLabels
-                .length, // Assuming xLabels is globally accessible and populated
+            xLabels.length, // Assuming xLabels is available and populated
         currentScale: 1.0,
       );
       _graphControllers[title]?.addListener(() {
@@ -66,8 +59,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
             // the button's enabled state based on controller.value
           });
         }
-        // Assuming xLabels content/length doesn't change after initState for this listener.
-        // If xLabels can change dynamically for a specific graph, this might need adjustment.
+        // Assuming xLabels is the relevant list for label count.
         _updateXAxisIntervalForGraph(title, xLabels.length);
       });
     }
@@ -77,60 +69,49 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     required int currentDataLength,
     required double currentScale,
   }) {
-    if (currentDataLength == 0) return 1.0;
+    const double targetLabelsInView =
+        7.0; // General target for number of labels in view
+    const double segmentsInView =
+        targetLabelsInView - 1.0; // Corresponding segments (6)
 
-    // Calculate the interval needed to show around `_maxLabelsToShowWhenZoomedOut` labels
-    // when the graph is fully zoomed out (scale = 1.0).
-    final double
-    zoomedOutInterval =
-        (currentDataLength <= _maxLabelsToShowWhenZoomedOut)
-            ? 1.0 // If fewer data points than target labels, show all.
-            // Otherwise, divide data length by target labels and ceil to get an integer interval.
-            : (currentDataLength.toDouble() / _maxLabelsToShowWhenZoomedOut)
-                .ceilToDouble();
-
-    double newInterpolatedInterval;
-
-    // Determine interval based on current zoom scale
-    if (currentScale <= _minScaleForDenseLabels) {
-      // If scale is at minimum (or less), use the calculated zoomedOutInterval.
-      newInterpolatedInterval = zoomedOutInterval;
-    } else if (currentScale >= _maxScaleForIntervalOne) {
-      // If scale is at maximum for dense labels (or more), set interval to 1 (show all labels).
-      newInterpolatedInterval = 1.0;
-    } else {
-      // Interpolate the interval for scales between _minScaleForDenseLabels and _maxScaleForIntervalOne.
-      // This creates a smoother transition from sparse to dense labels as the user zooms in.
-      final double factor =
-          (currentScale - _minScaleForDenseLabels) /
-          (_maxScaleForIntervalOne - _minScaleForDenseLabels);
-      newInterpolatedInterval =
-          zoomedOutInterval - factor * (zoomedOutInterval - 1.0);
+    // If the total dataset is small (e.g., 7 or fewer points), show all labels.
+    if (currentDataLength <= targetLabelsInView) {
+      return 1.0;
     }
 
-    double finalInterval;
-    // This condition helps to snap to an interval of 1.0 more decisively
-    // once the interpolated interval becomes very small (e.g., <= 1.5),
-    // provided that the graph isn't already showing all labels when zoomed out.
-    if (newInterpolatedInterval <= 1.5 && zoomedOutInterval > 1.0) {
-      finalInterval = 1.0;
-    } else {
-      // Otherwise, round the interpolated interval to the nearest whole number.
-      finalInterval = newInterpolatedInterval.roundToDouble();
-    }
+    // Estimate the number of data points currently visible in the viewport.
+    // Ensure estimatedVisiblePoints is at least 1.0 to avoid issues in calculations.
+    double estimatedVisiblePoints = max(1.0, currentDataLength / currentScale);
 
-    // Ensure the final interval is at least 1.0 (can't be less than showing every point)
-    // and not greater than the interval calculated for the fully zoomed-out state.
-    return finalInterval.clamp(1.0, zoomedOutInterval);
+    // Calculate the ideal interval that would aim to show targetLabelsInView
+    // within the current estimatedVisiblePoints.
+    double idealInterval = (estimatedVisiblePoints / segmentsInView);
+    double calculatedInterval = idealInterval.roundToDouble();
+
+    // Clamp the calculated interval:
+    // Minimum interval is 1.0.
+    // Maximum interval is what would show targetLabelsInView across the *entire* dataset (when scale is 1.0).
+    // This prevents the interval from becoming excessively large when zoomed out.
+    double maxSensibleIntervalOverall = (currentDataLength / segmentsInView)
+        .roundToDouble()
+        .clamp(1.0, double.infinity);
+    calculatedInterval = calculatedInterval.clamp(
+      1.0,
+      maxSensibleIntervalOverall,
+    );
+
+    // This function should now correctly return 1.0 when currentScale is high enough
+    // due to the adjusted dynamicMaxScale in _buildGraphSection.
+    return calculatedInterval;
   }
 
   void _updateXAxisIntervalForGraph(String graphTitle, int numLabels) {
     if (!mounted || _graphControllers[graphTitle] == null) return;
 
     final controller = _graphControllers[graphTitle]!;
-    // Get the current maximum scale factor from the controller.
-    // This represents how much the graph is zoomed in horizontally.
-    final scale = controller.value.getMaxScaleOnAxis();
+    final scale =
+        controller.value
+            .getMaxScaleOnAxis(); // Get current scale from the controller
 
     final double newInterval = _calculateXAxisInterval(
       currentDataLength: numLabels,
@@ -150,7 +131,6 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   void dispose() {
     _graphResetAnimationController?.dispose();
     for (var title in _graphTitles) {
-      // Listeners added with anonymous functions are generally handled by the controller's dispose.
       _graphControllers[title]?.dispose();
     }
     super.dispose();
@@ -166,9 +146,19 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        // Reset zoom/pan for all graphs when date changes
+        // When date changes, assume xLabels and other data might change.
+        // Reset graph views and recalculate intervals based on potentially new data.
+        // TODO: Fetch new data (xLabels, yValues) based on _selectedDate here.
+        // For now, we'll assume xLabels is updated externally before this rebuild.
         for (var title in _graphTitles) {
-          _instantTransformationReset(_graphControllers[title]!);
+          _instantTransformationReset(
+            _graphControllers[title]!,
+          ); // Resets controller scale to 1.0
+          _xAxisIntervals[title] = _calculateXAxisInterval(
+            currentDataLength:
+                xLabels.length, // Use potentially updated xLabels.length
+            currentScale: 1.0, // Scale is reset
+          );
         }
       });
     }
@@ -177,7 +167,19 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   void _instantTransformationReset(TransformationController controller) {
     if (!mounted) return;
     setState(() {
-      controller.value = Matrix4.identity(); // Reset to no zoom/pan
+      controller.value = Matrix4.identity(); // Resets scale to 1.0
+      String? graphTitleToUpdate;
+      _graphControllers.forEach((title, c) {
+        if (c == controller) {
+          graphTitleToUpdate = title;
+        }
+      });
+      if (graphTitleToUpdate != null) {
+        _xAxisIntervals[graphTitleToUpdate!] = _calculateXAxisInterval(
+          currentDataLength: xLabels.length, // Use current xLabels.length
+          currentScale: 1.0, // Scale is now 1.0
+        );
+      }
     });
   }
 
@@ -186,28 +188,24 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   ) {
     if (!mounted) return;
 
-    _graphResetAnimationController?.stop(); // Stop any ongoing animation
-    _graphResetAnimationController?.dispose(); // Dispose old controller
+    _graphResetAnimationController?.stop();
+    _graphResetAnimationController?.dispose();
 
     _controllerBeingReset = controllerToAnimate;
     _graphResetAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 500), // Animation duration
-      vsync: this, // Required for TickerProviderStateMixin
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
     );
 
     final CurvedAnimation curvedAnimation = CurvedAnimation(
       parent: _graphResetAnimationController!,
-      curve: Curves.easeInOutCubic, // Smooth animation curve
+      curve: Curves.easeInOutCubic,
     );
 
-    // Animate the matrix from its current state back to identity (no transformation)
     _graphResetMatrixAnimation = Matrix4Tween(
       begin: _controllerBeingReset!.value,
       end: Matrix4.identity(),
-    ).animate(curvedAnimation);
-
-    // Listener to update the controller's value during animation
-    _graphResetMatrixAnimation!.addListener(() {
+    ).animate(curvedAnimation)..addListener(() {
       if (mounted && _controllerBeingReset != null) {
         setState(() {
           _controllerBeingReset!.value = _graphResetMatrixAnimation!.value;
@@ -215,22 +213,30 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
       }
     });
 
-    // Listener for animation status (e.g., completion)
     _graphResetAnimationController!.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         if (mounted && _controllerBeingReset != null) {
           setState(() {
-            // Ensure it ends exactly at identity
             _controllerBeingReset!.value = Matrix4.identity();
+            String? graphTitleToUpdate;
+            _graphControllers.forEach((title, c) {
+              if (c == _controllerBeingReset) {
+                graphTitleToUpdate = title;
+              }
+            });
+            if (graphTitleToUpdate != null) {
+              _xAxisIntervals[graphTitleToUpdate!] = _calculateXAxisInterval(
+                currentDataLength: xLabels.length,
+                currentScale: 1.0,
+              );
+            }
           });
         }
-        // Clean up animation resources
         _graphResetAnimationController?.dispose();
         _graphResetAnimationController = null;
         _graphResetMatrixAnimation = null;
         _controllerBeingReset = null;
       } else if (status == AnimationStatus.dismissed) {
-        // Also clean up if dismissed (e.g., stopped early)
         _graphResetAnimationController?.dispose();
         _graphResetAnimationController = null;
         _graphResetMatrixAnimation = null;
@@ -238,19 +244,18 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
       }
     });
 
-    _graphResetAnimationController!.forward(from: 0.0); // Start the animation
+    _graphResetAnimationController!.forward(from: 0.0);
   }
 
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final String formattedDate = DateFormat(
-      'dd MMM yyyy',
-    ).format(_selectedDate);
+    final String formattedDate = DateFormat('dd MMM yy').format(_selectedDate);
+
+    final int currentXLabelsCount = xLabels.length;
 
     return Stack(
       children: [
-        // Background gradient
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -261,33 +266,52 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
           ),
         ),
         Scaffold(
-          backgroundColor:
-              Colors.transparent, // Make scaffold transparent to see gradient
+          backgroundColor: Colors.transparent,
           body: SafeArea(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
               child: SingleChildScrollView(
                 child: Column(
                   children: [
-                    // Header row with icons and logo
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        HoverCircleIcon(iconData: Icons.settings),
+                        HoverCircleIcon(
+                          iconData: Icons.settings,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SettingsPage(),
+                              ),
+                            );
+                          },
+                        ),
                         Image.asset(
                           'assets/smartfarm_logo.png',
                           height: 58,
-                          errorBuilder: // Fallback for image loading error
+                          errorBuilder:
                               (context, error, stackTrace) => const Icon(
                                 Icons.image_not_supported,
                                 size: 58,
                               ),
                         ),
-                        HoverCircleIcon(iconData: Icons.notifications_none),
+                        HoverCircleIcon(
+                          iconData: Icons.notifications_none,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) =>
+                                        const NotificationsLoaderPage(),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    // Page Title
                     const Align(
                       alignment: Alignment.center,
                       child: Text(
@@ -299,7 +323,6 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 15),
-                    // Date Selector Card
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -313,7 +336,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                             color: const Color.fromRGBO(158, 158, 158, 0.2),
                             spreadRadius: 1,
                             blurRadius: 3,
-                            offset: const Offset(0, 2), // Shadow position
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
@@ -343,9 +366,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                           ElevatedButton(
                             onPressed: () => _selectDate(context),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(
-                                0xFF2196F3,
-                              ), // Button color
+                              backgroundColor: const Color(0xFF2196F3),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 20,
                                 vertical: 10,
@@ -353,7 +374,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              elevation: 2, // Button shadow
+                              elevation: 2,
                             ),
                             child: Text(
                               formattedDate,
@@ -368,53 +389,59 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // Build graph sections for each metric
                     _buildGraphSection(
-                      _graphTitles[0], // Temperature
-                      temperatureValues, // Assuming this is globally accessible List<double>
-                      xLabels, // Assuming this is globally accessible List<String>
+                      _graphTitles[0],
+                      temperatureValues,
+                      xLabels,
                       _graphControllers[_graphTitles[0]]!,
                       _xAxisIntervals[_graphTitles[0]] ??
                           _calculateXAxisInterval(
-                            // Fallback interval calculation
-                            currentDataLength: xLabels.length,
-                            currentScale: 1.0,
+                            currentDataLength: currentXLabelsCount,
+                            currentScale:
+                                _graphControllers[_graphTitles[0]]!.value
+                                    .getMaxScaleOnAxis(),
                           ),
                     ),
                     _buildGraphSection(
-                      _graphTitles[1], // Humidity
+                      _graphTitles[1],
                       humidityValues,
                       xLabels,
                       _graphControllers[_graphTitles[1]]!,
                       _xAxisIntervals[_graphTitles[1]] ??
                           _calculateXAxisInterval(
-                            currentDataLength: xLabels.length,
-                            currentScale: 1.0,
+                            currentDataLength: currentXLabelsCount,
+                            currentScale:
+                                _graphControllers[_graphTitles[1]]!.value
+                                    .getMaxScaleOnAxis(),
                           ),
                     ),
                     _buildGraphSection(
-                      _graphTitles[2], // CO2 Level
+                      _graphTitles[2],
                       co2Values,
                       xLabels,
                       _graphControllers[_graphTitles[2]]!,
                       _xAxisIntervals[_graphTitles[2]] ??
                           _calculateXAxisInterval(
-                            currentDataLength: xLabels.length,
-                            currentScale: 1.0,
+                            currentDataLength: currentXLabelsCount,
+                            currentScale:
+                                _graphControllers[_graphTitles[2]]!.value
+                                    .getMaxScaleOnAxis(),
                           ),
                     ),
                     _buildGraphSection(
-                      _graphTitles[3], // Average Light Intensity
+                      _graphTitles[3],
                       lightIntensityValues,
                       xLabels,
                       _graphControllers[_graphTitles[3]]!,
                       _xAxisIntervals[_graphTitles[3]] ??
                           _calculateXAxisInterval(
-                            currentDataLength: xLabels.length,
-                            currentScale: 1.0,
+                            currentDataLength: currentXLabelsCount,
+                            currentScale:
+                                _graphControllers[_graphTitles[3]]!.value
+                                    .getMaxScaleOnAxis(),
                           ),
                     ),
-                    const SizedBox(height: 20), // Bottom padding
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -428,49 +455,68 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   Widget _buildGraphSection(
     String title,
     List<double> yValues,
-    List<String> currentXLabels, // Passed directly, assuming it's up-to-date
+    List<String> currentXLabels,
     TransformationController controller,
     double currentXAxisInterval,
   ) {
-    // Guard against empty or mismatched data
     if (yValues.isEmpty ||
         currentXLabels.isEmpty ||
         yValues.length != currentXLabels.length) {
       return Container(
-        height: 250, // Consistent height for no-data message
+        height: 250,
         alignment: Alignment.center,
         margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromARGB(31, 2, 0, 0),
+              blurRadius: 6,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
         child: Text(
-          'No data available for $title or data mismatch.',
+          'No data available for $title or data mismatch.\nPlease check data sources (yValues length: ${yValues.length}, xLabels length: ${currentXLabels.length}).',
           style: const TextStyle(fontSize: 16, color: Colors.grey),
+          textAlign: TextAlign.center,
         ),
       );
     }
 
-    // Calculate Y-axis range with padding
     double dataMinY = yValues.reduce(min);
     double dataMaxY = yValues.reduce(max);
     double yRange = dataMaxY - dataMinY;
-    // Add padding to avoid data points touching the border.
-    // If range is 0 (all points same value), add a default padding.
     double yPaddingValue = (yRange == 0) ? 10 : yRange * 0.1;
 
     double finalMinY = dataMinY - yPaddingValue;
-    // Add slightly more padding at the top for better visual separation.
     double finalMaxY = dataMaxY + (yPaddingValue * 1.5) + (yRange == 0 ? 5 : 0);
 
-    // Ensure minY and maxY are not the same, which can cause issues with FlChart.
     if (finalMinY == finalMaxY) {
-      finalMinY -= 5; // Arbitrary small difference
+      finalMinY -= 5;
       finalMaxY += 5;
     }
 
-    // Determine if the graph is in its default (identity) transformation state
     final bool isNormalView = controller.value == Matrix4.identity();
+    final bool showDots = currentXAxisInterval <= _maxIntervalForDots;
+
+    // Define the maximum zoom scale for the chart.
+    // This is set so that at maximum zoom, roughly 6 data points are visible across the viewport,
+    // which should ensure _calculateXAxisInterval results in an interval of 1.0.
+    // A minimum scale of 5.0 is maintained for very small datasets.
+    final double dynamicMaxScale;
+    if (currentXLabels.isNotEmpty) {
+      // Ensure at least a scale that shows ~6 points, or a minimum of 5.0
+      dynamicMaxScale = max(5.0, currentXLabels.length / 6.0);
+    } else {
+      dynamicMaxScale =
+          5.0; // Default if no labels (should ideally not happen with checks)
+    }
 
     return Column(
       children: [
-        // Graph title
         Align(
           alignment: Alignment.center,
           child: Text(
@@ -478,23 +524,20 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
             style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 18),
           ),
         ),
-        // Graph container
         Container(
-          height: 250, // Fixed height for the chart area
+          height: 250,
           margin: const EdgeInsets.only(top: 10),
           padding: const EdgeInsets.only(
-            left: 18, // Padding for Y-axis labels if shown on left
-            right:
-                18, // Padding for Y-axis labels if shown on right / chart edge
-            top: 8,
+            left: 12,
+            right: 18,
+            top: 12,
             bottom: 8,
           ),
           decoration: BoxDecoration(
-            color: Colors.white, // Card background
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: const [
               BoxShadow(
-                // Subtle shadow for depth
                 color: Color.fromARGB(31, 2, 0, 0),
                 blurRadius: 6,
                 offset: Offset(0, 3),
@@ -502,56 +545,63 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
             ],
           ),
           child: LineChart(
-            // Configuration for pan and zoom
+            duration: Duration.zero,
             transformationConfig: FlTransformationConfig(
-              scaleAxis:
-                  FlScaleAxis.horizontal, // Allow horizontal scaling (zoom)
-              minScale: 1, // Minimum zoom level (1x = no zoom)
-              maxScale: 20.0, // Maximum zoom level
-              panEnabled: _isPanEnabled, // Enable panning
-              scaleEnabled: _isScaleEnabled, // Enable scaling
-              transformationController:
-                  controller, // Controller for managing state
+              scaleAxis: FlScaleAxis.horizontal,
+              minScale: 1,
+              maxScale: dynamicMaxScale, // Use the adjusted dynamicMaxScale
+              panEnabled: _isPanEnabled,
+              scaleEnabled: _isScaleEnabled,
+              transformationController: controller,
             ),
             LineChartData(
-              gridData: FlGridData(show: true), // Show grid lines
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: true,
+                verticalInterval: currentXAxisInterval,
+                getDrawingVerticalLine: (value) {
+                  return FlLine(
+                    color: Colors.grey.withOpacity(0.35),
+                    strokeWidth: 0.8,
+                    dashArray: [4, 4],
+                  );
+                },
+                drawHorizontalLine: true,
+                getDrawingHorizontalLine: (value) {
+                  return FlLine(
+                    color: Colors.grey.withOpacity(0.35),
+                    strokeWidth: 0.8,
+                    dashArray: [4, 4],
+                  );
+                },
+              ),
               titlesData: FlTitlesData(
-                // Bottom (X-axis) titles
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
-                    showTitles: true, // Show the X-axis labels
-                    reservedSize: 30, // Space reserved for labels
-                    interval:
-                        currentXAxisInterval, // Calculated interval between labels
+                    showTitles: true,
+                    reservedSize: 30,
+                    interval: currentXAxisInterval,
                     getTitlesWidget: (value, meta) {
-                      // This function provides the widget for each X-axis label.
-                      // It's called for values determined by the 'interval'.
-
-                      // Ensure we only try to get labels for integer indices.
-                      // `value` can be a double due to FlSpot.x.
                       if (value != value.floor().toDouble()) {
-                        return const SizedBox.shrink(); // Don't show for non-integer x values
+                        return const SizedBox.shrink();
                       }
                       final int index = value.toInt();
                       if (index >= 0 && index < currentXLabels.length) {
                         return Padding(
-                          padding: const EdgeInsets.only(
-                            top: 8.0,
-                          ), // Padding above label text
+                          padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
-                            currentXLabels[index], // Get label string from the list
+                            currentXLabels[index],
                             style: const TextStyle(
                               color: Colors.black,
-                              fontSize: 10, // Label font size
+                              fontSize: 10,
                             ),
                           ),
                         );
                       }
-                      return const SizedBox.shrink(); // Return empty for out-of-bounds indices
+                      return const SizedBox.shrink();
                     },
                   ),
                 ),
-                // Hide titles on other sides
                 leftTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false),
                 ),
@@ -563,39 +613,32 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                 ),
               ),
               borderData: FlBorderData(
-                // Chart border
                 show: true,
                 border: Border.all(color: const Color(0xffe7e7e7), width: 1),
               ),
-              // X-axis range (from index 0 to last index)
               minX: 0,
               maxX: (currentXLabels.length - 1).toDouble().clamp(
-                0,
+                0.0,
                 double.infinity,
               ),
-              // Y-axis range (calculated with padding)
               minY: finalMinY,
               maxY: finalMaxY,
-              // Data for the line
               lineBarsData: [
                 LineChartBarData(
                   spots: List.generate(
-                    // Generate FlSpot from yValues
                     yValues.length,
                     (index) => FlSpot(index.toDouble(), yValues[index]),
                   ),
-                  isCurved: true, // Smooth curve for the line
-                  color: Colors.blueAccent, // Line color
-                  barWidth: 2, // Line thickness
-                  dotData: FlDotData(show: true), // Show dots on data points
+                  isCurved: true,
+                  color: Colors.blueAccent,
+                  barWidth: 2,
+                  dotData: FlDotData(show: showDots),
                   belowBarData: BarAreaData(
-                    // Area below the line
                     show: true,
                     gradient: LinearGradient(
-                      // Gradient fill for the area
                       colors: [
-                        const Color.fromRGBO(33, 150, 243, 0.3),
-                        const Color.fromRGBO(33, 150, 243, 0.1),
+                        Colors.blueAccent.withOpacity(0.3),
+                        Colors.blueAccent.withOpacity(0.05),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -603,27 +646,23 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                   ),
                 ),
               ],
-              // Tooltip configuration
               lineTouchData: LineTouchData(
-                handleBuiltInTouches: true, // Use default touch handling
+                handleBuiltInTouches: true,
                 touchTooltipData: LineTouchTooltipData(
-                  getTooltipColor: // Tooltip background color
+                  getTooltipColor:
                       (LineBarSpot spot) =>
-                          const Color.fromRGBO(96, 125, 139, 0.8),
+                          const Color.fromRGBO(96, 125, 139, 0.9),
                   getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
-                    // Customize tooltip content
                     return touchedBarSpots
                         .map((barSpot) {
                           final flSpot = barSpot;
-                          // Ensure index is valid
                           if (flSpot.x.toInt() < 0 ||
                               flSpot.x.toInt() >= currentXLabels.length) {
-                            return null; // Should not happen if data is consistent
+                            return null;
                           }
 
                           String timeLabel = currentXLabels[flSpot.x.toInt()];
-                          String unit =
-                              ''; // Determine unit based on graph title
+                          String unit = '';
                           switch (title) {
                             case 'Temperature':
                               unit = '°C';
@@ -643,19 +682,17 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                             color: Colors.white,
                             fontSize: 12,
                           );
-
                           return LineTooltipItem(
-                            '', // Empty main text, using children for formatted content
+                            '',
                             baseStyle,
                             children: [
                               TextSpan(
-                                text: '$timeLabel\n', // Time label
+                                text: '$timeLabel\n',
                                 style: baseStyle.copyWith(
                                   fontWeight: FontWeight.normal,
                                 ),
                               ),
                               TextSpan(
-                                // Value with unit
                                 text: '${flSpot.y.toStringAsFixed(1)} $unit',
                                 style: baseStyle.copyWith(
                                   fontWeight: FontWeight.bold,
@@ -665,24 +702,20 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                             textAlign: TextAlign.center,
                           );
                         })
-                        .where(
-                          (item) => item != null,
-                        ) // Filter out any null tooltips
+                        .whereType<LineTooltipItem>()
                         .toList();
                   },
-                  fitInsideHorizontally: true, // Ensure tooltip fits on screen
+                  fitInsideHorizontally: true,
                 ),
               ),
             ),
           ),
         ),
         const SizedBox(height: 20),
-        // Reset View Button
         SizedBox(
-          width: double.infinity, // Make button take full width
+          width: double.infinity,
           height: 40,
           child: FilledButton(
-            // Disable button if graph is already in normal (unzoomed/unpanned) view
             onPressed:
                 isNormalView
                     ? null
@@ -690,21 +723,15 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                         _animateTransformationControllerToIdentity(controller),
             style: FilledButton.styleFrom(
               backgroundColor: Colors.blue,
-              disabledBackgroundColor: const Color.fromRGBO(
-                33,
-                150,
-                243,
-                0.5,
-              ), // Appearance when disabled
+              disabledBackgroundColor: const Color.fromRGBO(33, 150, 243, 0.5),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: Row(
-              // Icon and text for button
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
+              children: [
                 Icon(Icons.refresh, size: 20, color: Colors.white),
                 SizedBox(width: 8),
                 Text(
@@ -719,83 +746,78 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
             ),
           ),
         ),
-        const SizedBox(height: 20), // Spacing after button
+        const SizedBox(height: 20),
       ],
     );
   }
 }
 
-// Widget for circular hover effect on icons (Settings, Notifications)
+// Dummy SettingsPage and NotificationsLoaderPage for compilation if not defined elsewhere
+// class SettingsPage extends StatelessWidget {
+//   const SettingsPage({super.key});
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(appBar: AppBar(title: const Text('Settings')));
+//   }
+// }
+
+// class NotificationsLoaderPage extends StatelessWidget {
+//   const NotificationsLoaderPage({super.key});
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(appBar: AppBar(title: const Text('Notifications')));
+//   }
+// }
+
+// Dummy data for xLabels and yValues if not available from 'variables.dart'
+// Ensure these are populated in your actual 'variables.dart' or fetched appropriately.
+// List<String> xLabels = List.generate(50, (index) => '${index + 1}:00');
+// List<double> temperatureValues = List.generate(50, (index) => 20 + sin(index / 5) * 5 + Random().nextDouble() * 2);
+// List<double> humidityValues = List.generate(50, (index) => 50 + cos(index / 3) * 10 + Random().nextDouble() * 5);
+// List<double> co2Values = List.generate(50, (index) => 400 + sin(index / 2) * 50 + Random().nextDouble() * 20);
+// List<double> lightIntensityValues = List.generate(50, (index) => 500 + cos(index / 4) * 100 + Random().nextDouble() * 50);
+
 class HoverCircleIcon extends StatefulWidget {
   final IconData iconData;
-  const HoverCircleIcon({required this.iconData, super.key});
+  final VoidCallback? onTap;
+
+  const HoverCircleIcon({required this.iconData, this.onTap, super.key});
+
   @override
   State<HoverCircleIcon> createState() => _HoverCircleIconState();
 }
 
 class _HoverCircleIconState extends State<HoverCircleIcon> {
-  bool _isHovering = false; // State to track hover
+  bool _isHovering = false;
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      // Makes the area tappable and provides hover effects
-      onTap: () {
-        // Navigation logic based on icon
-        if (widget.iconData == Icons.settings) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()),
-          );
-        } else if (widget.iconData == Icons.notifications_none) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const NotificationsLoaderPage(),
-            ),
-          );
+      onTap: widget.onTap,
+      onHover: (hovering) {
+        if (mounted) {
+          setState(() {
+            _isHovering = hovering;
+          });
         }
       },
-      onHover: (hovering) {
-        // Update hover state
-        setState(() {
-          _isHovering = hovering;
-        });
-      },
-      borderRadius: BorderRadius.circular(
-        50,
-      ), // Circular shape for hover effect
-      splashColor: const Color.fromRGBO(
-        0,
-        123,
-        255,
-        0.2,
-      ), // Splash color on tap
-      highlightColor: const Color.fromRGBO(
-        0,
-        123,
-        255,
-        0.1,
-      ), // Highlight color on press
+      borderRadius: BorderRadius.circular(50),
+      splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
+      highlightColor: const Color.fromRGBO(0, 123, 255, 0.1),
       child: AnimatedContainer(
-        // Animate background color change on hover
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color:
-              _isHovering // Change color based on hover state
-                  ? const Color.fromRGBO(
-                    158,
-                    158,
-                    158,
-                    0.1,
-                  ) // Light grey when hovering
-                  : Colors.transparent, // Transparent when not hovering
+              _isHovering
+                  ? const Color.fromRGBO(158, 158, 158, 0.1)
+                  : Colors.transparent,
         ),
         child: Icon(
           widget.iconData,
           size: 24,
-          color: const Color.fromARGB(221, 0, 0, 0), // Icon color
+          color: const Color.fromARGB(221, 0, 0, 0),
         ),
       ),
     );
