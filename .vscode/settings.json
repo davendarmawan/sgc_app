@@ -56,5 +56,6 @@
   "C_Cpp_Runner.showCompilationTime": false,
   "C_Cpp_Runner.useLinkTimeOptimization": false,
   "C_Cpp_Runner.msvcSecureNoWarnings": false,
-  "cmake.sourceDirectory": "C:/Users/Daven/Documents/ITB Data/TA/Mobile Apps/sgc_app/windows"
+  "cmake.sourceDirectory": "C:/Users/Daven/Documents/ITB Data/TA/Mobile Apps/sgc_app/windows",
+  "java.configuration.updateBuildConfiguration": "interactive"
 }
