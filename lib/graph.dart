@@ -250,7 +250,9 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final String formattedDate = DateFormat('dd MMM yy').format(_selectedDate);
+    final String formattedDate = DateFormat(
+      'dd MMM yyyy',
+    ).format(_selectedDate);
 
     final int currentXLabelsCount = xLabels.length;
 
@@ -528,10 +530,10 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
           height: 250,
           margin: const EdgeInsets.only(top: 10),
           padding: const EdgeInsets.only(
-            left: 12,
+            left: 18,
             right: 18,
             top: 12,
-            bottom: 8,
+            bottom: 3,
           ),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -561,7 +563,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                 verticalInterval: currentXAxisInterval,
                 getDrawingVerticalLine: (value) {
                   return FlLine(
-                    color: Colors.grey.withOpacity(0.35),
+                    color: const Color.fromRGBO(158, 158, 158, 0.35),
                     strokeWidth: 0.8,
                     dashArray: [4, 4],
                   );
@@ -569,7 +571,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                 drawHorizontalLine: true,
                 getDrawingHorizontalLine: (value) {
                   return FlLine(
-                    color: Colors.grey.withOpacity(0.35),
+                    color: const Color.fromRGBO(158, 158, 158, 0.35),
                     strokeWidth: 0.8,
                     dashArray: [4, 4],
                   );
@@ -630,15 +632,15 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                     (index) => FlSpot(index.toDouble(), yValues[index]),
                   ),
                   isCurved: true,
-                  color: Colors.blueAccent,
+                  color: Colors.blue,
                   barWidth: 2,
                   dotData: FlDotData(show: showDots),
                   belowBarData: BarAreaData(
                     show: true,
                     gradient: LinearGradient(
                       colors: [
-                        Colors.blueAccent.withOpacity(0.3),
-                        Colors.blueAccent.withOpacity(0.05),
+                        Color.fromRGBO(33, 150, 243, 0.3),
+                        Color.fromRGBO(33, 150, 243, 0.1),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
