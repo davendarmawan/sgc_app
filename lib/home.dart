@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart'; 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'variables.dart';
 import 'settings.dart';
 import 'nightday.dart';
@@ -47,12 +47,14 @@ class _HomePageState extends State<HomePage> {
       String? jwtToken = await secureStorage.read(key: 'jwt_token');
       String? userId = await secureStorage.read(key: 'user_id');
       String? userLevel = await secureStorage.read(key: 'user_level');
-      
+
       print('Auth data check:');
-      print('   JWT Token: ${jwtToken != null ? 'Found (${jwtToken.length} chars)' : 'Not found'}');
+      print(
+        '   JWT Token: ${jwtToken != null ? 'Found (${jwtToken.length} chars)' : 'Not found'}',
+      );
       print('   User ID: $userId');
       print('   User Level: $userLevel');
-      
+
       if (jwtToken != null) {
         print('✅ Token found, initializing LiveConditionService...');
         // Now initialize the service
@@ -61,13 +63,14 @@ class _HomePageState extends State<HomePage> {
           baseUrl: 'https://demo.smartfarm.id',
           authToken: jwtToken,
         );
-        
+
         print('📡 Starting to listen for live data...');
         // Start listening
         liveService!.startListening().listen(
           (data) {
             print('📊 LIVE DATA RECEIVED: $data');
-            if (mounted) { // Check if widget is still mounted
+            if (mounted) {
+              // Check if widget is still mounted
               setState(() {
                 // Update UI - this will trigger a rebuild
                 print('🔄 UI updated with new data');
@@ -78,12 +81,12 @@ class _HomePageState extends State<HomePage> {
             print('❌ Stream error: $error');
           },
         );
-        
+
         print('✅ Service initialized successfully');
       } else {
         print('⚠️ No JWT token found - user needs to login');
       }
-      
+
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -147,66 +150,98 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  
-                  // ADD THIS: Connection status indicator
-                  if (liveService != null)
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: liveService!.isConnected ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            liveService!.isConnected ? Icons.wifi : Icons.wifi_off,
-                            size: 16,
-                            color: liveService!.isConnected ? Colors.green : Colors.red,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            liveService!.isConnected ? 'Connected' : 'Disconnected',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: liveService!.isConnected ? Colors.green[800] : Colors.red[800],
+
+                  Row(
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .center, // UPDATED for vertical centering
+                    children: [
+                      // Left side: Greetings
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  getIcon().iconData,
+                                  size: 30,
+                                  color: getIcon().iconColor,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  "Good ${getGreeting()}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 30,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      children: [
-                        Icon(
-                          getIcon().iconData,
-                          size: 30,
-                          color: getIcon().iconColor,
+                            const SizedBox(height: 0),
+                            const Text(
+                              'Welcome Home!',
+                              style: TextStyle(
+                                fontWeight: FontWeight.normal,
+                                fontSize: 20,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Text(
-                          "Good ${getGreeting()}",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 30,
+                      ),
+                      // Right side: Connection Status Indicator
+                      if (liveService != null)
+                        Container(
+                          // margin: const EdgeInsets.only(top: 4), // REMOVED manual margin
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                liveService!.isConnected
+                                    ? Colors.green.withOpacity(0.2)
+                                    : Colors.red.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            // UPDATED from Row to Column
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                liveService!.isConnected
+                                    ? Icons.wifi
+                                    : Icons.wifi_off,
+                                size: 18, // Slightly larger icon
+                                color:
+                                    liveService!.isConnected
+                                        ? Colors.green
+                                        : Colors.red,
+                              ),
+                              const SizedBox(
+                                height: 2,
+                              ), // Small gap between icon and text
+                              Text(
+                                liveService!.isConnected
+                                    ? 'Connected'
+                                    : 'Disconnected',
+                                style: TextStyle(
+                                  fontSize:
+                                      10, // Smaller font for text below icon
+                                  color:
+                                      liveService!.isConnected
+                                          ? Colors.green[800]
+                                          : Colors.red[800],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      // ADD THIS SizedBox to push the indicator a bit to the left
+                      if (liveService != null) const SizedBox(width: 5.0),
+                    ],
                   ),
-                  const SizedBox(height: 0),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: const Text(
-                      'Welcome Home!',
-                      style: TextStyle(
-                        fontWeight: FontWeight.normal,
-                        fontSize: 20,
-                      ),
-                    ),
-                  ),
+
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
@@ -339,33 +374,63 @@ class _HomePageState extends State<HomePage> {
                               SensorCard(
                                 title: 'Temperature',
                                 // UPDATED: Use live data if available, otherwise use variables.dart
-                                value: liveService?.getFormattedCondition('temperature').split(' ')[0] ?? temperature,
+                                value:
+                                    liveService
+                                        ?.getFormattedCondition('temperature')
+                                        .split(' ')[0] ??
+                                    temperature,
                                 unit: '°C',
-                                setpoint: liveService?.getFormattedSetpoint('temperature') ?? getSetpoint('temperature'),
+                                setpoint:
+                                    liveService?.getFormattedSetpoint(
+                                      'temperature',
+                                    ) ??
+                                    getSetpoint('temperature'),
                                 icon: Icons.thermostat,
                                 iconColor: Colors.redAccent,
                               ),
                               SensorCard(
                                 title: 'Humidity',
-                                value: liveService?.getFormattedCondition('humidity').split(' ')[0] ?? humidity,
+                                value:
+                                    liveService
+                                        ?.getFormattedCondition('humidity')
+                                        .split(' ')[0] ??
+                                    humidity,
                                 unit: '%',
-                                setpoint: liveService?.getFormattedSetpoint('humidity') ?? getSetpoint('humidity'),
+                                setpoint:
+                                    liveService?.getFormattedSetpoint(
+                                      'humidity',
+                                    ) ??
+                                    getSetpoint('humidity'),
                                 icon: Icons.water_drop,
                                 iconColor: Colors.blueAccent,
                               ),
                               SensorCard(
                                 title: 'CO₂',
-                                value: liveService?.getFormattedCondition('co2').split(' ')[0] ?? co2,
+                                value:
+                                    liveService
+                                        ?.getFormattedCondition('co2')
+                                        .split(' ')[0] ??
+                                    co2,
                                 unit: 'ppm',
-                                setpoint: liveService?.getFormattedSetpoint('co2') ?? getSetpoint('co2'),
+                                setpoint:
+                                    liveService?.getFormattedSetpoint('co2') ??
+                                    getSetpoint('co2'),
                                 icon: Icons.cloud,
                                 iconColor: Colors.green,
                               ),
                               SensorCard(
                                 title: 'Light',
-                                value: liveService?.getFormattedCondition('light').split(' ')[0] ?? lightIntensity,
+                                value:
+                                    liveService
+                                        ?.getFormattedCondition('light')
+                                        .split(' ')[0] ??
+                                    lightIntensity,
                                 unit: 'LUX',
-                                setpoint: liveService?.getFormattedSetpoint('light') ?? getSetpoint('light'),
+                                setpoint:
+                                    liveService?.getFormattedSetpoint(
+                                      'light',
+                                    ) ??
+                                    getSetpoint('light'),
                                 icon: Icons.wb_sunny,
                                 iconColor: Colors.orangeAccent,
                                 extraInfo: getMode('light'),

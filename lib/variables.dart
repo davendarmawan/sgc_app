@@ -71,6 +71,8 @@ List<double> lightIntensityValues = [
   270,
   280,
   290,
+  300,
+  310,
 ];
 
 /* Spectrometer Menu Data */
