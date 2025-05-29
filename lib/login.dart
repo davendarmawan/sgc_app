@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
 import 'register.dart';
+import 'services/auth_service.dart'; // Add this import
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,6 +18,7 @@ class LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
   bool _isLoading = true;
   bool _obscurePassword = true;
+  bool _isLoginLoading = false; // Add this for login button loading state
 
   @override
   void initState() {
@@ -27,7 +29,11 @@ class LoginPageState extends State<LoginPage> {
   Future<void> _checkRememberMe() async {
     final prefs = await SharedPreferences.getInstance();
     final remembered = prefs.getBool('remember_me') ?? false;
-    if (remembered) {
+    
+    // Also check if user is already logged in via AuthService
+    final isLoggedIn = await AuthService.isLoggedIn();
+    
+    if (remembered || isLoggedIn) {
       if (!mounted) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -46,6 +52,69 @@ class LoginPageState extends State<LoginPage> {
   Future<void> _setRememberMe(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('remember_me', value);
+  }
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoginLoading = true;
+    });
+
+    try {
+      String email = _usernameController.text.trim();
+      String password = _passwordController.text;
+
+      // Use AuthService to login
+      bool loginSuccess = await AuthService.loginUser(email, password);
+
+      if (loginSuccess) {
+        // Set remember me preference
+        await _setRememberMe(_rememberMe);
+        
+        if (!mounted) return;
+        
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Login successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Navigate to home screen
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const HomeScreen(),
+            ),
+          );
+        });
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid email or password. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Login error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoginLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -96,16 +165,18 @@ class LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 40),
                 TextFormField(
                   controller: _usernameController,
+                  keyboardType: TextInputType.emailAddress, // Add email keyboard type
                   decoration: const InputDecoration(
-                    labelText: 'Username',
+                    labelText: 'Email', // Changed from Username to Email
                     border: OutlineInputBorder(),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.blue, width: 2),
                     ),
+                    prefixIcon: Icon(Icons.email), // Add email icon
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your username';
+                      return 'Please enter your email';
                     }
                     return null;
                   },
@@ -117,9 +188,10 @@ class LoginPageState extends State<LoginPage> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     border: const OutlineInputBorder(),
-                    focusedBorder: OutlineInputBorder(
+                    focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.blue, width: 2),
                     ),
+                    prefixIcon: const Icon(Icons.lock), // Add lock icon
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -136,6 +208,9 @@ class LoginPageState extends State<LoginPage> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
                     }
                     return null;
                   },
@@ -158,7 +233,6 @@ class LoginPageState extends State<LoginPage> {
                         }
                         return null; // Default color when unchecked
                       }),
-
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(3),
                       ),
@@ -168,32 +242,7 @@ class LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      String username = _usernameController.text;
-                      String password = _passwordController.text;
-
-                      if (username == 'testuser' && password == 'password123') {
-                        await _setRememberMe(_rememberMe);
-                        if (!mounted) return;
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (!mounted) return;
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (context) => const HomeScreen(),
-                            ),
-                          );
-                        });
-                      } else {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Invalid username or password'),
-                          ),
-                        );
-                      }
-                    }
-                  },
+                  onPressed: _isLoginLoading ? null : _handleLogin, // Updated to use new login method
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -201,22 +250,31 @@ class LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.login, color: Colors.white, size: 24),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Login',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                  child: _isLoginLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.login, color: Colors.white, size: 24),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'Login',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(height: 20),
                 TextButton(

@@ -6,6 +6,7 @@ import 'change_pwd.dart'; // Import the ChangePasswordPage
 import 'nightday.dart';
 import 'dev_settings.dart';
 import 'login.dart'; // Import LoginPage for navigation after logout
+import 'services/auth_service.dart'; // Add this import
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -136,31 +137,114 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
 
-                // Log Out Section
-                Align(
-                  alignment: Alignment.center,
-                  child: TextButton(
-                    onPressed: () async {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setBool(
-                        'remember_me',
-                        false,
-                      ); // Clear remember me flag
+              // Log Out Section
+              Align(
+                alignment: Alignment.center,
+                child: TextButton(
+                  onPressed: () async {
+                    // Show confirmation dialog
+                    final shouldLogout = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text('Confirm Logout'),
+                          content: const Text('Are you sure you want to log out?'),
+                          actions: [
+                            TextButton(
+                              child: const Text('Cancel'),
+                              onPressed: () => Navigator.of(context).pop(false),
+                            ),
+                            TextButton(
+                              child: const Text('Logout', style: TextStyle(color: Colors.red)),
+                              onPressed: () => Navigator.of(context).pop(true),
+                            ),
+                          ],
+                        );
+                      },
+                    );
 
+                    // If user confirmed logout
+                    if (shouldLogout == true) {
+                      // Show loading indicator
                       if (!context.mounted) return;
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
-                        ),
-                        (Route<dynamic> route) => false,
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (BuildContext context) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        },
                       );
-                    },
-                    child: const Text(
-                      'Log Out',
-                      style: TextStyle(fontSize: 18, color: Colors.red),
-                    ),
+
+                      try {
+                        // Call AuthService logout (which calls the API)
+                        final logoutSuccess = await AuthService.logoutUser();
+                        
+                        // Clear SharedPreferences remember me flag
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('remember_me', false);
+
+                        if (!context.mounted) return;
+                        
+                        // Close loading dialog
+                        Navigator.of(context).pop();
+
+                        if (logoutSuccess) {
+                          // Show success message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Logged out successfully'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+
+                        // Navigate to login page and clear navigation stack
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (context) => const LoginPage(),
+                          ),
+                          (Route<dynamic> route) => false,
+                        );
+                        
+                      } catch (error) {
+                        if (!context.mounted) return;
+                        
+                        // Close loading dialog
+                        Navigator.of(context).pop();
+                        
+                        // Show error message but still proceed to login
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Logout error: ${error.toString()}'),
+                            backgroundColor: Colors.orange,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+
+                        // Clear local data and go to login anyway
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('remember_me', false);
+                        await AuthService.logout(); // Fallback local cleanup
+                        
+                        if (!context.mounted) return;
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (context) => const LoginPage(),
+                          ),
+                          (Route<dynamic> route) => false,
+                        );
+                      }
+                    }
+                  },
+                  child: const Text(
+                    'Log Out',
+                    style: TextStyle(fontSize: 18, color: Colors.red),
                   ),
                 ),
+              ),
 
                 // SmartFarm Logo Container at the Bottom
                 Align(
