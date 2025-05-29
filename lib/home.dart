@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; 
 import 'variables.dart';
 import 'settings.dart';
 import 'nightday.dart';
 import 'notifications_loader.dart';
 import 'package:carousel_slider_plus/carousel_slider_plus.dart';
+import 'services/liveCondition_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,6 +15,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final FlutterSecureStorage secureStorage = FlutterSecureStorage();
+  LiveConditionService? liveService;
+  bool isLoading = true;
   int _currentCarouselIndex = 0;
 
   final List<String> cameraPreviewImages = [
@@ -26,6 +31,82 @@ class _HomePageState extends State<HomePage> {
     'Bottom Camera',
     'User Camera',
   ];
+
+  // ADD THIS: Initialize the service when widget starts
+  @override
+  void initState() {
+    super.initState();
+    print('🚀 HomePage initState called');
+    _initializeService();
+  }
+
+  Future<void> _initializeService() async {
+    print('🔄 Starting service initialization...');
+    try {
+      // Get the token first
+      String? jwtToken = await secureStorage.read(key: 'jwt_token');
+      String? userId = await secureStorage.read(key: 'user_id');
+      String? userLevel = await secureStorage.read(key: 'user_level');
+      
+      print('Auth data check:');
+      print('   JWT Token: ${jwtToken != null ? 'Found (${jwtToken.length} chars)' : 'Not found'}');
+      print('   User ID: $userId');
+      print('   User Level: $userLevel');
+      
+      if (jwtToken != null) {
+        print('✅ Token found, initializing LiveConditionService...');
+        // Now initialize the service
+        liveService = LiveConditionService(
+          deviceId: '1',
+          baseUrl: 'https://demo.smartfarm.id',
+          authToken: jwtToken,
+        );
+        
+        print('📡 Starting to listen for live data...');
+        // Start listening
+        liveService!.startListening().listen(
+          (data) {
+            print('📊 LIVE DATA RECEIVED: $data');
+            if (mounted) { // Check if widget is still mounted
+              setState(() {
+                // Update UI - this will trigger a rebuild
+                print('🔄 UI updated with new data');
+              });
+            }
+          },
+          onError: (error) {
+            print('❌ Stream error: $error');
+          },
+        );
+        
+        print('✅ Service initialized successfully');
+      } else {
+        print('⚠️ No JWT token found - user needs to login');
+      }
+      
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error initializing service: $e');
+      print('❌ Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  // ADD THIS: Clean up when widget is disposed
+  @override
+  void dispose() {
+    print('🧹 Disposing HomePage and LiveConditionService');
+    liveService?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +147,35 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   const SizedBox(height: 10),
+                  
+                  // ADD THIS: Connection status indicator
+                  if (liveService != null)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: liveService!.isConnected ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            liveService!.isConnected ? Icons.wifi : Icons.wifi_off,
+                            size: 16,
+                            color: liveService!.isConnected ? Colors.green : Colors.red,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            liveService!.isConnected ? 'Connected' : 'Disconnected',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: liveService!.isConnected ? Colors.green[800] : Colors.red[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Row(
@@ -228,33 +338,34 @@ class _HomePageState extends State<HomePage> {
                             children: [
                               SensorCard(
                                 title: 'Temperature',
-                                value: temperature,
+                                // UPDATED: Use live data if available, otherwise use variables.dart
+                                value: liveService?.getFormattedCondition('temperature').split(' ')[0] ?? temperature,
                                 unit: '°C',
-                                setpoint: getSetpoint('temperature'),
+                                setpoint: liveService?.getFormattedSetpoint('temperature') ?? getSetpoint('temperature'),
                                 icon: Icons.thermostat,
                                 iconColor: Colors.redAccent,
                               ),
                               SensorCard(
                                 title: 'Humidity',
-                                value: humidity,
+                                value: liveService?.getFormattedCondition('humidity').split(' ')[0] ?? humidity,
                                 unit: '%',
-                                setpoint: getSetpoint('humidity'),
+                                setpoint: liveService?.getFormattedSetpoint('humidity') ?? getSetpoint('humidity'),
                                 icon: Icons.water_drop,
                                 iconColor: Colors.blueAccent,
                               ),
                               SensorCard(
                                 title: 'CO₂',
-                                value: co2,
+                                value: liveService?.getFormattedCondition('co2').split(' ')[0] ?? co2,
                                 unit: 'ppm',
-                                setpoint: getSetpoint('co2'),
+                                setpoint: liveService?.getFormattedSetpoint('co2') ?? getSetpoint('co2'),
                                 icon: Icons.cloud,
                                 iconColor: Colors.green,
                               ),
                               SensorCard(
                                 title: 'Light',
-                                value: lightIntensity,
+                                value: liveService?.getFormattedCondition('light').split(' ')[0] ?? lightIntensity,
                                 unit: 'LUX',
-                                setpoint: getSetpoint('light'),
+                                setpoint: liveService?.getFormattedSetpoint('light') ?? getSetpoint('light'),
                                 icon: Icons.wb_sunny,
                                 iconColor: Colors.orangeAccent,
                                 extraInfo: getMode('light'),
@@ -402,7 +513,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// Public class to hold icon and its color
+// Rest of your classes remain the same...
 class IconDataAndColor {
   final IconData iconData;
   final Color iconColor;
