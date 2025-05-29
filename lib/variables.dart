@@ -1,3 +1,5 @@
+import 'dart:math';
+
 // File to store variables to the app data
 
 /* Home Menu Data */
@@ -8,8 +10,56 @@ String lightIntensity = '1000.0';
 
 /* Graph Menu Data*/
 
-// X-axis labels (time)
+// Helper function to generate a list of random doubles within a range
+List<double> generateRandomData(
+  int count,
+  double min,
+  double max, {
+  int decimalPlaces = 1,
+}) {
+  Random random = Random();
+  List<double> data = [];
+  for (int i = 0; i < count; i++) {
+    double value = min + random.nextDouble() * (max - min);
+    data.add(double.parse(value.toStringAsFixed(decimalPlaces)));
+  }
+  return data;
+}
+
+// X-axis labels (time) - 24 hours, 30-minute intervals
 List<String> xLabels = [
+  "00:00",
+  "00:30",
+  "01:00",
+  "01:30",
+  "02:00",
+  "02:30",
+  "03:00",
+  "03:30",
+  "04:00",
+  "04:30",
+  "05:00",
+  "05:30",
+  "06:00",
+  "06:30",
+  "07:00",
+  "07:30",
+  "08:00",
+  "08:30",
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
   "16:00",
   "16:30",
   "17:00",
@@ -22,58 +72,23 @@ List<String> xLabels = [
   "20:30",
   "21:00",
   "21:30",
-]; // Provide your own x-axis labels
-
-// Temperature data (Y-axis values)
-List<double> temperatureValues = [
-  30,
-  32,
-  35,
-  33,
-  31,
-  40,
-  38,
-  36,
-  37,
-  39,
-  41,
-  42,
+  "22:00",
+  "22:30",
+  "23:00",
+  "23:30",
 ];
 
-// Humidity data (Y-axis values)
-List<double> humidityValues = [50, 52, 48, 49, 50, 70, 60, 65, 68, 72, 75, 80];
+// Temperature data (Y-axis values) - Randomized for 48 data points
+List<double> temperatureValues = generateRandomData(48, 20.0, 45.0);
 
-// CO2 Level data (Y-axis values)
-List<double> co2Values = [
-  400,
-  420,
-  410,
-  430,
-  440,
-  450,
-  460,
-  470,
-  480,
-  490,
-  500,
-  510,
-];
+// Humidity data (Y-axis values) - Randomized for 48 data points
+List<double> humidityValues = generateRandomData(48, 30.0, 90.0);
 
-// Average Light Intensity data (Y-axis values)
-List<double> lightIntensityValues = [
-  200,
-  250,
-  230,
-  210,
-  220,
-  240,
-  260,
-  270,
-  280,
-  290,
-  300,
-  310,
-];
+// CO2 Level data (Y-axis values) - Randomized for 48 data points
+List<double> co2Values = generateRandomData(48, 300.0, 1000.0);
+
+// Average Light Intensity data (Y-axis values) - Randomized for 48 data points
+List<double> lightIntensityValues = generateRandomData(48, 100.0, 1500.0);
 
 /* Spectrometer Menu Data */
 
