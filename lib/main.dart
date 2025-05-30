@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'home.dart'; // Import HomePage
 import 'graph.dart'; // Import GraphPage
 import 'setpoint.dart'; // Import SetpointPage
 import 'camera.dart'; // Import CameraPage
 import 'spectrum.dart'; // Import SpectrumPage
-
 import 'login.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
-    _,
-  ) {
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
     // Set status bar color to transparent
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -39,7 +35,7 @@ class SmartFarmApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
         fontFamily: GoogleFonts.nunito().fontFamily,
       ),
-      home: const LoginPage(), // Set HomeScreen as default screen
+      home: const LoginPage(), // Set LoginPage as default screen
       debugShowCheckedModeBanner: false,
     );
   }

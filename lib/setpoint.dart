@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:async'; // Add this import for StreamSubscription
 import 'variables.dart'; // Import the variables file
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'settings.dart';
 import 'notifications_loader.dart';
+import 'services/setpoint_service.dart'; // Import the setpoint service
 
 class SetpointPage extends StatefulWidget {
   const SetpointPage({super.key});
@@ -25,7 +27,6 @@ class CustomThumbShape extends RoundSliderThumbShape {
   double get enabledThumbRadius => 12.0;
 
   @override
-  @override
   void paint(
     PaintingContext context,
     Offset center, {
@@ -43,19 +44,17 @@ class CustomThumbShape extends RoundSliderThumbShape {
     final Canvas canvas = context.canvas;
 
     // Draw the white filled circle inside (full radius)
-    final Paint fillPaint =
-        Paint()
-          ..color = sliderTheme.thumbColor ?? Colors.white
-          ..style = PaintingStyle.fill;
+    final Paint fillPaint = Paint()
+      ..color = sliderTheme.thumbColor ?? Colors.white
+      ..style = PaintingStyle.fill;
 
     canvas.drawCircle(center, enabledThumbRadius, fillPaint);
 
     // Draw the blue outline circle (stroke centered on radius - half stroke width)
-    final Paint outlinePaint =
-        Paint()
-          ..color = outlineColor
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = outlineWidth;
+    final Paint outlinePaint = Paint()
+      ..color = outlineColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = outlineWidth;
 
     canvas.drawCircle(
       center,
@@ -66,77 +65,228 @@ class CustomThumbShape extends RoundSliderThumbShape {
 }
 
 class SetpointPageState extends State<SetpointPage> {
-  String selectedParameter = 'Temperature';
-
-  final Map<String, IconData> parameterIcons = {
-    'Temperature': Icons.thermostat,
-    'Humidity': Icons.water_drop_outlined,
-    'CO₂': Icons.cloud_outlined,
-    'Light': Icons.light_mode_outlined,
-  };
+  String selectedPeriod = 'day'; // day or night selection
+  bool isSubmitting = false; // Track submission state
+  String deviceId = '1'; // Replace with actual device ID - could be from user selection or storage
+  StreamSubscription<Map<String, dynamic>>? _callbackSubscription;
+  
+  // Store pending setpoint values to apply after gateway confirmation
+  Map<String, dynamic>? _pendingSetpoints;
 
   // Controllers for input fields to capture new setpoints
-  final TextEditingController _dayTempController = TextEditingController();
-  final TextEditingController _nightTempController = TextEditingController();
-  final TextEditingController _dayHumidityController = TextEditingController();
-  final TextEditingController _nightHumidityController =
-      TextEditingController();
-  final TextEditingController _dayCO2Controller = TextEditingController();
-  final TextEditingController _nightCO2Controller = TextEditingController();
+  final TextEditingController _tempController = TextEditingController();
+  final TextEditingController _humidityController = TextEditingController();
+  final TextEditingController _co2Controller = TextEditingController();
+  final TextEditingController _lightIntensityController = TextEditingController();
 
-  // Light settings controllers
-  final TextEditingController _dayLightIntensityController =
-      TextEditingController();
-  final TextEditingController _nightLightIntensityController =
-      TextEditingController();
+  // Light mode for current selection
+  int currentLightMode = 1; // Default light mode
 
-  int lightModeDay = 1; // Default light mode
-  int lightModeNight = 1; // Default light mode
+  // PWM values for manual mode
+  double currentParPWM = 0;
+  double currentRedPWM = 0;
+  double currentBluePWM = 0;
+  double currentUvPWM = 0;
+  double currentIrPWM = 0;
 
   @override
   void initState() {
     super.initState();
-    // Initialize controllers with current values from variables.dart
-    _dayTempController.text = dayTemperature.toString();
-    _nightTempController.text = nightTemperature.toString();
-    _dayHumidityController.text = dayHumidity.toString();
-    _nightHumidityController.text = nightHumidity.toString();
-    _dayCO2Controller.text = dayCO2.toString();
-    _nightCO2Controller.text = nightCO2.toString();
-    _dayLightIntensityController.text = dayLightIntensity.toString();
-    _nightLightIntensityController.text = nightLightIntensity.toString();
+    _updateControllersForPeriod();
+    _initializeCallbackListener();
   }
 
   @override
   void dispose() {
-    _dayTempController.dispose();
-    _nightTempController.dispose();
-    _dayHumidityController.dispose();
-    _nightHumidityController.dispose();
-    _dayCO2Controller.dispose();
-    _nightCO2Controller.dispose();
-    _dayLightIntensityController.dispose();
-    _nightLightIntensityController.dispose();
-
+    _tempController.dispose();
+    _humidityController.dispose();
+    _co2Controller.dispose();
+    _lightIntensityController.dispose();
+    _callbackSubscription?.cancel();
+    SetpointService.closeCallbackSSE();
     super.dispose();
   }
 
-  // Helper to get the current mode description string based on lightMode integer
-  String get currentDayModeDescription {
-    if (lightModeDay >= 1 && lightModeDay <= 5) {
-      return modeDescriptions[lightModeDay - 1];
-    } else if (lightModeDay == 6) {
-      return 'Manual';
+  /// Initialize callback SSE listener for gateway feedback
+  void _initializeCallbackListener() {
+    _callbackSubscription = SetpointService.initializeCallbackSSE(
+      deviceId: deviceId,
+    ).listen(
+      (callbackData) {
+        print('📡 Gateway callback received: $callbackData');
+        
+        // Handle different types of callbacks
+        if (callbackData['message'] != null) {
+          final message = callbackData['message'] as String;
+          
+          // Handle specific callback types
+          if (message.contains('Setpoint settings received')) {
+            print('✅ Gateway confirmed setpoint reception');
+            
+            // Now update local variables since gateway confirmed
+            if (_pendingSetpoints != null) {
+              _applyPendingSetpoints();
+            }
+            
+            // Show success notification
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ ${_pendingSetpoints?['period']} setpoints applied successfully!'),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            
+          } else if (message.contains('Camera command received')) {
+            print('✅ Gateway confirmed camera command reception');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('📷 Camera command received by gateway'),
+                backgroundColor: Colors.blue,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else if (message.contains('Day Night time settings received')) {
+            print('✅ Gateway confirmed schedule reception');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('🕐 Schedule settings received by gateway'),
+                backgroundColor: Colors.blue,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else if (message.contains('Spectrum command received')) {
+            print('✅ Gateway confirmed spectrum command reception');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('🌈 Spectrum command received by gateway'),
+                backgroundColor: Colors.blue,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      },
+      onError: (error) {
+        print('❌ Callback stream error: $error');
+      },
+    );
+  }
+
+  /// Apply pending setpoints to local variables after gateway confirmation
+  void _applyPendingSetpoints() {
+    if (_pendingSetpoints == null) return;
+    
+    setState(() {
+      final period = _pendingSetpoints!['period'];
+      final newTemp = _pendingSetpoints!['temperature'];
+      final newHumidity = _pendingSetpoints!['humidity'];
+      final newCO2 = _pendingSetpoints!['co2'];
+      final lightMode = _pendingSetpoints!['lightMode'];
+      final newLightIntensity = _pendingSetpoints!['lightIntensity'];
+      final pwmValues = _pendingSetpoints!['pwmValues'];
+      
+      if (period == 'day') {
+        dayTemperature = newTemp;
+        dayHumidity = newHumidity;
+        dayCO2 = newCO2;
+        
+        // Update day light settings
+        if (lightMode == 6) {
+          dayLightMode = 'Manual';
+          if (pwmValues != null) {
+            parDayPWM = pwmValues['par'];
+            redDayPWM = pwmValues['red'];
+            blueDayPWM = pwmValues['blue'];
+            uvDayPWM = pwmValues['uv'];
+            irDayPWM = pwmValues['ir'];
+          }
+        } else {
+          dayLightMode = 'Mode $lightMode';
+          if (lightMode != 5) {
+            dayLightIntensity = newLightIntensity;
+          } else {
+            dayLightIntensity = 0;
+          }
+        }
+      } else {
+        nightTemperature = newTemp;
+        nightHumidity = newHumidity;
+        nightCO2 = newCO2;
+        
+        // Update night light settings
+        if (lightMode == 6) {
+          nightLightMode = 'Manual';
+          if (pwmValues != null) {
+            parNightPWM = pwmValues['par'];
+            redNightPWM = pwmValues['red'];
+            blueNightPWM = pwmValues['blue'];
+            uvNightPWM = pwmValues['uv'];
+            irNightPWM = pwmValues['ir'];
+          }
+        } else {
+          nightLightMode = 'Mode $lightMode';
+          if (lightMode != 5) {
+            nightLightIntensity = newLightIntensity;
+          } else {
+            nightLightIntensity = 0;
+          }
+        }
+      }
+      
+      // Clear pending setpoints
+      _pendingSetpoints = null;
+    });
+  }
+
+  // Update controllers based on selected period (day/night)
+  void _updateControllersForPeriod() {
+    if (selectedPeriod == 'day') {
+      _tempController.text = dayTemperature.toString();
+      _humidityController.text = dayHumidity.toString();
+      _co2Controller.text = dayCO2.toString();
+      _lightIntensityController.text = dayLightIntensity.toString();
+      
+      // Update light mode
+      if (dayLightMode == 'Manual') {
+        currentLightMode = 6;
+      } else {
+        currentLightMode = int.tryParse(dayLightMode.replaceAll('Mode ', '')) ?? 1;
+      }
+      
+      // Update PWM values for manual mode
+      currentParPWM = parDayPWM;
+      currentRedPWM = redDayPWM;
+      currentBluePWM = blueDayPWM;
+      currentUvPWM = uvDayPWM;
+      currentIrPWM = irDayPWM;
     } else {
-      return 'Unknown';
+      _tempController.text = nightTemperature.toString();
+      _humidityController.text = nightHumidity.toString();
+      _co2Controller.text = nightCO2.toString();
+      _lightIntensityController.text = nightLightIntensity.toString();
+      
+      // Update light mode
+      if (nightLightMode == 'Manual') {
+        currentLightMode = 6;
+      } else {
+        currentLightMode = int.tryParse(nightLightMode.replaceAll('Mode ', '')) ?? 1;
+      }
+      
+      // Update PWM values for manual mode
+      currentParPWM = parNightPWM;
+      currentRedPWM = redNightPWM;
+      currentBluePWM = blueNightPWM;
+      currentUvPWM = uvNightPWM;
+      currentIrPWM = irNightPWM;
     }
   }
 
-  // Helper to get the current mode description string based on lightMode integer
-  String get currentNightModeDescription {
-    if (lightModeNight >= 1 && lightModeNight <= 5) {
-      return modeDescriptions[lightModeNight - 1];
-    } else if (lightModeNight == 6) {
+  // Helper to get the current mode description
+  String get currentModeDescription {
+    if (currentLightMode >= 1 && currentLightMode <= 5) {
+      return modeDescriptions[currentLightMode - 1];
+    } else if (currentLightMode == 6) {
       return 'Manual';
     } else {
       return 'Unknown';
@@ -166,6 +316,7 @@ class SetpointPageState extends State<SetpointPage> {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
+                    // Header with navigation icons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -173,17 +324,18 @@ class SetpointPageState extends State<SetpointPage> {
                         Image.asset(
                           'assets/smartfarm_logo.png',
                           height: 58,
-                          errorBuilder:
-                              (context, error, stackTrace) =>
-                                  const Icon(Icons.image_not_supported),
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.image_not_supported),
                         ),
                         HoverCircleIcon(iconData: Icons.notifications_none),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Align(
+                    
+                    // Page Title
+                    const Align(
                       alignment: Alignment.center,
-                      child: const Text(
+                      child: Text(
                         'Setpoint',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -191,471 +343,186 @@ class SetpointPageState extends State<SetpointPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children:
-                          parameterIcons.keys.map((parameter) {
-                            final bool isSelected =
-                                selectedParameter == parameter;
-                            return Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                ),
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      selectedParameter = parameter;
-                                      // Reset controllers when switching tabs
-                                      if (parameter == 'Temperature') {
-                                        _dayTempController.text =
-                                            dayTemperature.toString();
-                                        _nightTempController.text =
-                                            nightTemperature.toString();
-                                      } else if (parameter == 'Humidity') {
-                                        _dayHumidityController.text =
-                                            dayHumidity.toString();
-                                        _nightHumidityController.text =
-                                            nightHumidity.toString();
-                                      } else if (parameter == 'CO₂') {
-                                        _dayCO2Controller.text =
-                                            dayCO2.toString();
-                                        _nightCO2Controller.text =
-                                            nightCO2.toString();
-                                      }
-                                    });
-                                  },
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        parameterIcons[parameter],
-                                        size: 32,
-                                        color:
-                                            isSelected
-                                                ? Colors.blue
-                                                : Colors.grey,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        parameter,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color:
-                                              isSelected
-                                                  ? Colors.blue
-                                                  : Colors.grey,
-                                          fontWeight:
-                                              isSelected
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                    ),
                     const SizedBox(height: 20),
 
-                    // Show parameter setpoints with current values and input fields
-                    if (selectedParameter == 'Temperature') ...[
-                      Align(
-                        alignment: Alignment.center,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildParameterCard(
-                              Icons.sunny,
-                              'Day Setpoint',
-                              '${dayTemperature.toStringAsFixed(1)} °C',
-                            ),
-                            const SizedBox(width: 10),
-                            _buildParameterCard(
-                              Icons.dark_mode,
-                              'Night Setpoint',
-                              '${nightTemperature.toStringAsFixed(1)} °C',
-                            ),
-                          ],
-                        ),
+                    // Day/Night Selection
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      const Divider(thickness: 1),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Temperature Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color.fromARGB(255, 0, 0, 0),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildSetpointInputField(
-                        'Day Temperature (°C)',
-                        _dayTempController,
-                      ),
-                      _buildSetpointInputField(
-                        'Night Temperature (°C)',
-                        _nightTempController,
-                      ),
-                    ],
-
-                    // Humidity and CO₂ settings
-                    if (selectedParameter == 'Humidity') ...[
-                      _buildHumidityCO2Section(
-                        'Humidity',
-                        _dayHumidityController,
-                        _nightHumidityController,
-                      ),
-                    ],
-
-                    if (selectedParameter == 'CO₂') ...[
-                      _buildHumidityCO2Section(
-                        'CO₂',
-                        _dayCO2Controller,
-                        _nightCO2Controller,
-                      ),
-                    ],
-
-                    if (selectedParameter == 'Light') ...[
-                      Align(
-                        alignment: Alignment.center,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildLightCard(
-                              Icons.sunny,
-                              'Day Setpoint',
-                              dayLightMode,
-                              '${dayLightIntensity.toStringAsFixed(1)} LUX',
-                            ),
-                            const SizedBox(width: 10),
-                            _buildLightCard(
-                              Icons.dark_mode,
-                              'Night Setpoint',
-                              nightLightMode,
-                              '${nightLightIntensity.toStringAsFixed(1)} LUX',
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Divider(thickness: 1),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Day Light Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color.fromARGB(255, 0, 0, 0),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Dropdown for Light Mode selection
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton2<String>(
-                          buttonStyleData: ButtonStyleData(
-                            width: screenWidth,
-                            padding: const EdgeInsets.only(left: 20, right: 20),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: Colors.transparent,
-                              border: Border.all(color: Colors.blue, width: 2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedPeriod = 'day';
+                                  _updateControllersForPeriod();
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: selectedPeriod == 'day' 
+                                      ? Colors.blue 
+                                      : Colors.transparent,
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(12),
+                                    bottomLeft: Radius.circular(12),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.sunny,
+                                      color: selectedPeriod == 'day'
+                                          ? Colors.white
+                                          : const Color(0xFFFFA726),
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Day',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: selectedPeriod == 'day'
+                                            ? Colors.white
+                                            : Colors.grey[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                          dropdownStyleData: DropdownStyleData(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedPeriod = 'night';
+                                  _updateControllersForPeriod();
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: selectedPeriod == 'night' 
+                                      ? Colors.blue 
+                                      : Colors.transparent,
+                                  borderRadius: const BorderRadius.only(
+                                    topRight: Radius.circular(12),
+                                    bottomRight: Radius.circular(12),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.dark_mode,
+                                      color: selectedPeriod == 'night'
+                                          ? Colors.white
+                                          : const Color(0xFF90A4AE),
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Night',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: selectedPeriod == 'night'
+                                            ? Colors.white
+                                            : Colors.grey[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                          iconStyleData: const IconStyleData(
-                            icon: Icon(Icons.arrow_drop_down_rounded),
-                            iconSize: 30,
-                            openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
-                            iconEnabledColor: Colors.blue,
-                          ),
-                          value: currentDayModeDescription,
-                          onChanged: (String? newValue) {
-                            if (newValue == null) return;
-
-                            setState(() {
-                              if (newValue.startsWith('Mode ')) {
-                                final modeNumberString =
-                                    newValue.split(':')[0].split(' ')[1];
-                                lightModeDay =
-                                    int.tryParse(modeNumberString) ??
-                                    lightModeDay;
-                              } else if (newValue == 'Manual') {
-                                lightModeDay = 6;
-                              }
-                            });
-                          },
-                          items:
-                              modeDescriptions.map<DropdownMenuItem<String>>((
-                                String mode,
-                              ) {
-                                return DropdownMenuItem<String>(
-                                  value: mode,
-                                  child: Text(mode),
-                                );
-                              }).toList(),
-                        ),
+                        ],
                       ),
+                    ),
+                    const SizedBox(height: 30),
 
-                      const SizedBox(height: 10),
+                    // Temperature Section
+                    _buildParameterSection(
+                      icon: Icons.thermostat,
+                      title: 'Temperature',
+                      unit: '°C',
+                      controller: _tempController,
+                      iconColor: Colors.red,
+                    ),
 
-                      // Show light intensity for Mode 1-4 only
-                      if (lightModeDay != 5 && lightModeDay != 6) ...[
-                        _buildSetpointInputField(
-                          'Day Light Intensity (LUX)',
-                          _dayLightIntensityController,
-                        ),
-                      ],
+                    // Humidity Section
+                    _buildParameterSection(
+                      icon: Icons.water_drop_outlined,
+                      title: 'Humidity',
+                      unit: '%',
+                      controller: _humidityController,
+                      iconColor: Colors.blue,
+                    ),
 
-                      // Show sliders for Manual Mode inside one white container
-                      if (lightModeDay == 6) ...[
-                        const SizedBox(height: 10),
-                        _buildSlidersGroup([
-                          _buildSlider(
-                            'PAR Light',
-                            parDayPWM,
-                            (newValue) {
-                              parDayPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFFFFA726,
-                            ), // Soothing Orange
-                            outlineColor: const Color(0xFFFFA726),
-                          ),
-                          _buildSlider(
-                            'Red Light',
-                            redDayPWM,
-                            (newValue) {
-                              redDayPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFFE53935,
-                            ), // Soothing Red
-                            outlineColor: const Color(0xFFE53935),
-                          ),
-                          _buildSlider(
-                            'Blue Light',
-                            blueDayPWM,
-                            (newValue) {
-                              blueDayPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFF42A5F5,
-                            ), // Blue (keep)
-                            outlineColor: const Color(0xFF42A5F5),
-                          ),
-                          _buildSlider(
-                            'UV Light',
-                            uvDayPWM,
-                            (newValue) {
-                              uvDayPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFF7E57C2,
-                            ), // Soothing Violet
-                            outlineColor: const Color(0xFF7E57C2),
-                          ),
-                          _buildSlider(
-                            'IR Light',
-                            irDayPWM,
-                            (newValue) {
-                              irDayPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFFFF8A80,
-                            ), // Light Red
-                            outlineColor: const Color(0xFFFF8A80),
-                            showDivider: false,
-                          ),
-                        ]),
-                      ],
+                    // CO₂ Section
+                    _buildParameterSection(
+                      icon: Icons.cloud_outlined,
+                      title: 'CO₂',
+                      unit: 'ppm',
+                      controller: _co2Controller,
+                      iconColor: Colors.green,
+                    ),
 
-                      const SizedBox(height: 10),
+                    // Light Section
+                    _buildLightSection(),
 
-                      const Divider(thickness: 1),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Night Light Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color.fromARGB(255, 0, 0, 0),
-                        ),
-                      ),
+                    const SizedBox(height: 30),
 
-                      const SizedBox(height: 10),
-                      // Dropdown for Light Mode selection
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton2<String>(
-                          buttonStyleData: ButtonStyleData(
-                            width: screenWidth,
-                            padding: const EdgeInsets.only(left: 20, right: 20),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              color: Colors.transparent,
-                              border: Border.all(color: Colors.blue, width: 2),
-                            ),
-                          ),
-                          dropdownStyleData: DropdownStyleData(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          iconStyleData: const IconStyleData(
-                            icon: Icon(Icons.arrow_drop_down_rounded),
-                            iconSize: 30,
-                            openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
-                            iconEnabledColor: Colors.blue,
-                          ),
-                          value: currentNightModeDescription,
-                          onChanged: (String? newValue) {
-                            if (newValue == null) return;
-
-                            setState(() {
-                              if (newValue.startsWith('Mode ')) {
-                                final modeNumberString =
-                                    newValue.split(':')[0].split(' ')[1];
-                                lightModeNight =
-                                    int.tryParse(modeNumberString) ??
-                                    lightModeNight;
-                              } else if (newValue == 'Manual') {
-                                lightModeNight = 6;
-                              }
-                            });
-                          },
-                          items:
-                              modeDescriptions.map<DropdownMenuItem<String>>((
-                                String mode,
-                              ) {
-                                return DropdownMenuItem<String>(
-                                  value: mode,
-                                  child: Text(mode),
-                                );
-                              }).toList(),
-                        ),
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // Show light intensity for Mode 1-4 only
-                      if (lightModeNight != 5 && lightModeNight != 6) ...[
-                        _buildSetpointInputField(
-                          'Night Light Intensity (LUX)',
-                          _nightLightIntensityController,
-                        ),
-                      ],
-
-                      // Show sliders for Manual Mode inside one white container
-                      if (lightModeNight == 6) ...[
-                        const SizedBox(height: 10),
-                        _buildSlidersGroup([
-                          _buildSlider(
-                            'PAR Light',
-                            parNightPWM,
-                            (newValue) {
-                              parNightPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFFFFA726,
-                            ), // Soothing Orange
-                            outlineColor: const Color(0xFFFFA726),
-                          ),
-                          _buildSlider(
-                            'Red Light',
-                            redNightPWM,
-                            (newValue) {
-                              redNightPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFFE53935,
-                            ), // Soothing Red
-                            outlineColor: const Color(0xFFE53935),
-                          ),
-                          _buildSlider(
-                            'Blue Light',
-                            blueNightPWM,
-                            (newValue) {
-                              blueNightPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFF42A5F5,
-                            ), // Blue (keep)
-                            outlineColor: const Color(0xFF42A5F5),
-                          ),
-                          _buildSlider(
-                            'UV Light',
-                            uvNightPWM,
-                            (newValue) {
-                              uvNightPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFF7E57C2,
-                            ), // Soothing Violet
-                            outlineColor: const Color(0xFF7E57C2),
-                          ),
-                          _buildSlider(
-                            'IR Light',
-                            irNightPWM,
-                            (newValue) {
-                              irNightPWM = newValue;
-                            },
-                            activeTrackColor: const Color(
-                              0xFFFF8A80,
-                            ), // Light Red
-                            outlineColor: const Color(0xFFFF8A80),
-                            showDivider: false,
-                          ),
-                        ]),
-                      ],
-                      const SizedBox(height: 15),
-                    ],
-
+                    // Submit Button
                     SizedBox(
                       width: MediaQuery.of(context).size.width,
                       child: FilledButton(
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: () {
-                          if (selectedParameter == 'Temperature') {
-                            _saveTemperatureSetpoints();
-                          } else if (selectedParameter == 'Humidity') {
-                            _saveHumiditySetpoints();
-                          } else if (selectedParameter == 'CO₂') {
-                            _saveCO2Setpoints();
-                          } else if (selectedParameter == 'Light') {
-                            _saveLightSetpoints();
-                          }
-                        },
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.save_as, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text(
-                              "Save Setpoints",
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
+                        onPressed: isSubmitting ? null : _submitSetpoints,
+                        child: isSubmitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.send, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "Submit Setpoints",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
 
@@ -670,51 +537,239 @@ class SetpointPageState extends State<SetpointPage> {
     );
   }
 
-  Widget _buildSetpointInputField(
-    String label,
-    TextEditingController controller,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: TextField(
-        controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(color: Colors.black),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Colors.blue),
+  Widget _buildParameterSection({
+    required IconData icon,
+    required String title,
+    required String unit,
+    required TextEditingController controller,
+    required Color iconColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, 2),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Colors.blue, width: 2),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-        ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: '$title ($unit)',
+              labelStyle: const TextStyle(color: Colors.black54),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.blue),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.blue, width: 2),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSlidersGroup(List<Widget> sliders) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Container(
-          width: constraints.maxWidth, // Use full available width
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white, // White background behind all sliders
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 4,
-                offset: Offset(0, 2),
+  Widget _buildLightSection() {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.light_mode_outlined, color: Colors.amber, size: 24),
+              SizedBox(width: 12),
+              Text(
+                'Light',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
-          child: Column(children: sliders),
-        );
-      },
+          const SizedBox(height: 16),
+
+          // Light Mode Dropdown
+          DropdownButtonHideUnderline(
+            child: DropdownButton2<String>(
+              buttonStyleData: ButtonStyleData(
+                width: screenWidth,
+                padding: const EdgeInsets.only(left: 20, right: 20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.transparent,
+                  border: Border.all(color: Colors.blue, width: 2),
+                ),
+              ),
+              dropdownStyleData: DropdownStyleData(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              iconStyleData: const IconStyleData(
+                icon: Icon(Icons.arrow_drop_down_rounded),
+                iconSize: 30,
+                openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
+                iconEnabledColor: Colors.blue,
+              ),
+              value: currentModeDescription,
+              onChanged: (String? newValue) {
+                if (newValue == null) return;
+
+                setState(() {
+                  if (newValue.startsWith('Mode ')) {
+                    final modeNumberString = newValue.split(':')[0].split(' ')[1];
+                    currentLightMode = int.tryParse(modeNumberString) ?? currentLightMode;
+                  } else if (newValue == 'Manual') {
+                    currentLightMode = 6;
+                  }
+                });
+              },
+              items: modeDescriptions.map<DropdownMenuItem<String>>((String mode) {
+                return DropdownMenuItem<String>(
+                  value: mode,
+                  child: Text(mode),
+                );
+              }).toList(),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Light Intensity for Mode 1-4
+          if (currentLightMode != 5 && currentLightMode != 6) ...[
+            TextField(
+              controller: _lightIntensityController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Light Intensity (LUX)',
+                labelStyle: const TextStyle(color: Colors.black54),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.blue),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Colors.blue, width: 2),
+                ),
+              ),
+            ),
+          ],
+
+          // Manual PWM Sliders for Mode 6
+          if (currentLightMode == 6) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Manual Light Control',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildSlider(
+              'PAR Light',
+              currentParPWM,
+              (newValue) => currentParPWM = newValue,
+              activeTrackColor: const Color(0xFFFFA726),
+              outlineColor: const Color(0xFFFFA726),
+            ),
+            _buildSlider(
+              'Red Light',
+              currentRedPWM,
+              (newValue) => currentRedPWM = newValue,
+              activeTrackColor: const Color(0xFFE53935),
+              outlineColor: const Color(0xFFE53935),
+            ),
+            _buildSlider(
+              'Blue Light',
+              currentBluePWM,
+              (newValue) => currentBluePWM = newValue,
+              activeTrackColor: const Color(0xFF42A5F5),
+              outlineColor: const Color(0xFF42A5F5),
+            ),
+            _buildSlider(
+              'UV Light',
+              currentUvPWM,
+              (newValue) => currentUvPWM = newValue,
+              activeTrackColor: const Color(0xFF7E57C2),
+              outlineColor: const Color(0xFF7E57C2),
+            ),
+            _buildSlider(
+              'IR Light',
+              currentIrPWM,
+              (newValue) => currentIrPWM = newValue,
+              activeTrackColor: const Color(0xFFFF8A80),
+              outlineColor: const Color(0xFFFF8A80),
+              showDivider: false,
+            ),
+          ],
+
+          // Mode 5 indicator
+          if (currentLightMode == 5) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: const Text(
+                'Lights Off',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black54,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -726,372 +781,177 @@ class SetpointPageState extends State<SetpointPage> {
     Color activeTrackColor = Colors.blue,
     Color outlineColor = Colors.blue,
   }) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(label, style: const TextStyle(color: Colors.black)),
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                activeTrackColor: activeTrackColor,
-                inactiveTrackColor: activeTrackColor.withAlpha(
-                  (0.3 * 255).toInt(),
-                ),
-                trackHeight: 15.0,
-                thumbColor: Colors.white,
-                overlayColor: activeTrackColor.withAlpha((0.2 * 255).toInt()),
-                thumbShape: CustomThumbShape(
-                  outlineColor: outlineColor,
-                  outlineWidth: 2.0,
-                ),
-                overlayShape: const RoundSliderOverlayShape(
-                  overlayRadius: 24.0,
-                ),
-                valueIndicatorColor: activeTrackColor,
-                valueIndicatorTextStyle: const TextStyle(color: Colors.white),
-              ),
-              child: SizedBox(
-                width: constraints.maxWidth,
-                child: Slider(
-                  value: value,
-                  min: 0,
-                  max: 100,
-                  divisions: 100,
-                  label: '${value.toStringAsFixed(0)}%',
-                  onChanged: (double newValue) {
-                    setState(() {
-                      onChanged(newValue);
-                    });
-                  },
-                ),
-              ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: activeTrackColor,
+            inactiveTrackColor: activeTrackColor.withAlpha((0.3 * 255).toInt()),
+            trackHeight: 15.0,
+            thumbColor: Colors.white,
+            overlayColor: activeTrackColor.withAlpha((0.2 * 255).toInt()),
+            thumbShape: CustomThumbShape(
+              outlineColor: outlineColor,
+              outlineWidth: 2.0,
             ),
-            if (showDivider)
-              const Divider(thickness: 1, height: 20, color: Colors.grey),
-          ],
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 24.0),
+            valueIndicatorColor: activeTrackColor,
+            valueIndicatorTextStyle: const TextStyle(color: Colors.white),
+          ),
+          child: Slider(
+            value: value,
+            min: 0,
+            max: 100,
+            divisions: 100,
+            label: '${value.toStringAsFixed(0)}%',
+            onChanged: (double newValue) {
+              setState(() {
+                onChanged(newValue);
+              });
+            },
+          ),
+        ),
+        if (showDivider) const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  void _submitSetpoints() async {
+    // Check authentication first
+    if (!await SetpointService.isAuthenticated()) {
+      _showErrorDialog('Authentication required. Please login again.');
+      return;
+    }
+
+    // Validate input fields
+    if (_tempController.text.isEmpty ||
+        _humidityController.text.isEmpty ||
+        _co2Controller.text.isEmpty ||
+        (currentLightMode != 5 && currentLightMode != 6 && _lightIntensityController.text.isEmpty)) {
+      _showErrorDialog('Please fill in all required fields.');
+      return;
+    }
+
+    // Parse values
+    final double? newTemp = double.tryParse(_tempController.text);
+    final double? newHumidity = double.tryParse(_humidityController.text);
+    final double? newCO2 = double.tryParse(_co2Controller.text);
+    final double? newLightIntensity = currentLightMode != 5 && currentLightMode != 6 
+        ? double.tryParse(_lightIntensityController.text) 
+        : (currentLightMode == 5 ? 0 : null);
+
+    if (newTemp == null || newHumidity == null || newCO2 == null ||
+        (currentLightMode != 6 && newLightIntensity == null)) {
+      _showErrorDialog('Please enter valid numeric values.');
+      return;
+    }
+
+    // Validate setpoints against limits
+    Map<String, double>? pwmValues;
+    if (currentLightMode == 6) {
+      pwmValues = {
+        'par': currentParPWM,
+        'red': currentRedPWM,
+        'blue': currentBluePWM,
+        'uv': currentUvPWM,
+        'ir': currentIrPWM,
+      };
+    }
+
+    if (!SetpointService.validateSetpoints(
+      temperature: newTemp,
+      humidity: newHumidity,
+      co2: newCO2,
+      lightMode: currentLightMode,
+      lightPWM: pwmValues,
+    )) {
+      _showErrorDialog('Setpoint values are outside acceptable limits.');
+      return;
+    }
+
+    // Start submission process
+    setState(() {
+      isSubmitting = true;
+    });
+
+    try {
+      bool success = false;
+      
+      if (selectedPeriod == 'day') {
+        success = await SetpointService.sendDaySetpoints(
+          deviceId: deviceId,
+          temperature: newTemp,
+          humidity: newHumidity,
+          co2: newCO2,
+          lightMode: currentLightMode,
+          intensity: newLightIntensity,
+          lightPWM: pwmValues,
         );
-      },
-    );
-  }
-
-  Widget _buildParameterCard(IconData icon, String label, String value) {
-    Color iconColor;
-    if (icon == Icons.sunny) {
-      iconColor = const Color(0xFFFFA726); // Orange
-    } else if (icon == Icons.dark_mode) {
-      iconColor = const Color(0xFF90A4AE); // Moon color (soft blue-gray)
-    } else {
-      iconColor = Colors.blue;
-    }
-
-    return SizedBox(
-      width: 160, // Same width for both cards
-      height: 160, // Same height for both cards
-      child: Card(
-        elevation: 2,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 40, color: iconColor),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLightCard(
-    IconData icon,
-    String label,
-    String mode,
-    String value,
-  ) {
-    Color iconColor;
-    if (icon == Icons.sunny) {
-      iconColor = const Color(0xFFFFA726); // Orange
-    } else if (icon == Icons.dark_mode) {
-      iconColor = const Color(0xFF90A4AE); // Moon color (soft blue-gray)
-    } else {
-      iconColor = Colors.blue;
-    }
-
-    return SizedBox(
-      width: 160, // Same width for both cards
-      height: 160, // Same height for both cards
-      child: Card(
-        elevation: 2,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 40, color: iconColor),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              // Container for Mode
-              Container(
-                margin: const EdgeInsets.all(3),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  mode,
-                  style: const TextStyle(color: Colors.black54, fontSize: 12),
-                ),
-              ),
-
-              // SizedBox for Setpoint
-              const SizedBox(height: 4),
-              Text(
-                mode == "Mode 5"
-                    ? 'Lights Off'
-                    : mode == 'Manual'
-                    ? 'Custom'
-                    : value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _saveTemperatureSetpoints() {
-    if (_dayTempController.text.isEmpty || _nightTempController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all temperature fields.')),
-      );
-      return;
-    }
-
-    final double? newDayTemp = double.tryParse(_dayTempController.text);
-    final double? newNightTemp = double.tryParse(_nightTempController.text);
-
-    if (newDayTemp == null || newNightTemp == null) {
-      _showErrorDialog('Please enter valid numeric values for temperatures.');
-      return;
-    }
-
-    setState(() {
-      dayTemperature = newDayTemp;
-      nightTemperature = newNightTemp;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Temperature setpoints updated successfully!'),
-      ),
-    );
-  }
-
-  void _saveHumiditySetpoints() {
-    if (_dayHumidityController.text.isEmpty ||
-        _nightHumidityController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all humidity fields.')),
-      );
-      return;
-    }
-
-    final double? newDayHumidity = double.tryParse(_dayHumidityController.text);
-    final double? newNightHumidity = double.tryParse(
-      _nightHumidityController.text,
-    );
-
-    if (newDayHumidity == null || newNightHumidity == null) {
-      _showErrorDialog('Please enter valid numeric values for humidity.');
-      return;
-    }
-
-    setState(() {
-      dayHumidity = newDayHumidity;
-      nightHumidity = newNightHumidity;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Humidity setpoints updated successfully!')),
-    );
-  }
-
-  void _saveCO2Setpoints() {
-    if (_dayCO2Controller.text.isEmpty || _nightCO2Controller.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all CO₂ fields.')),
-      );
-      return;
-    }
-
-    final double? newDayCO2 = double.tryParse(_dayCO2Controller.text);
-    final double? newNightCO2 = double.tryParse(_nightCO2Controller.text);
-
-    if (newDayCO2 == null || newNightCO2 == null) {
-      _showErrorDialog('Please enter valid numeric values for CO₂ levels.');
-      return;
-    }
-
-    setState(() {
-      dayCO2 = newDayCO2;
-      nightCO2 = newNightCO2;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('CO₂ setpoints updated successfully!')),
-    );
-  }
-
-  void _saveLightSetpoints() {
-    if ((lightModeDay != 5 &&
-            lightModeDay != 6 &&
-            _dayLightIntensityController.text.isEmpty) ||
-        (lightModeNight != 5 &&
-            lightModeNight != 6 &&
-            _nightLightIntensityController.text.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all light intensity fields.'),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      if (lightModeDay == 6) {
-        dayLightMode = 'Manual';
       } else {
-        dayLightMode = 'Mode $lightModeDay'; // Store selected light mode
+        success = await SetpointService.sendNightSetpoints(
+          deviceId: deviceId,
+          temperature: newTemp,
+          humidity: newHumidity,
+          co2: newCO2,
+          lightMode: currentLightMode,
+          intensity: newLightIntensity,
+          lightPWM: pwmValues,
+        );
       }
 
-      if (lightModeNight == 6) {
-        nightLightMode = 'Manual';
+      if (success) {
+        // Store pending setpoints to apply after gateway confirmation
+        _pendingSetpoints = {
+          'period': selectedPeriod,
+          'temperature': newTemp,
+          'humidity': newHumidity,
+          'co2': newCO2,
+          'lightMode': currentLightMode,
+          'lightIntensity': newLightIntensity ?? 0,
+          'pwmValues': pwmValues,
+        };
+        
+        // Just show that the API call was successful
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('⏳ Setpoints sent to server, waiting for gateway confirmation...'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       } else {
-        nightLightMode = 'Mode $lightModeNight'; // Store selected light mode
+        _showErrorDialog('Failed to send setpoints to gateway. Please try again.');
       }
-
-      // Update Day Light Intensity
-      if (lightModeDay != 5 && lightModeDay != 6) {
-        // Update Day Intensity for Modes 1-4
-        dayLightIntensity = double.tryParse(_dayLightIntensityController.text)!;
-      } else if (lightModeDay == 5) {
-        // If Mode 5 is selected, all lights are off
-        dayLightIntensity = 0;
-      }
-
-      // Update Night Light Intensity
-      if (lightModeNight != 5 && lightModeNight != 6) {
-        // Update Night Intensity for Modes 1-4
-        nightLightIntensity =
-            double.tryParse(_nightLightIntensityController.text)!;
-      } else if (lightModeNight == 5) {
-        // If Mode 5 is selected, all lights are off
-        nightLightIntensity = 0;
-      }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Light setpoints updated successfully!')),
-    );
+    } catch (e) {
+      _showErrorDialog('Network error: ${e.toString()}');
+    } finally {
+      setState(() {
+        isSubmitting = false;
+      });
+    }
   }
 
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder:
-          (ctx) => AlertDialog(
-            title: const Text('Invalid Input'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
           ),
-    );
-  }
-
-  Widget _buildHumidityCO2Section(
-    String label,
-    TextEditingController dayController,
-    TextEditingController nightController,
-  ) {
-    return Column(
-      children: [
-        Align(
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildParameterCard(
-                Icons.sunny,
-                'Day Setpoint',
-                '${dayController.text} ${label == 'CO₂' ? 'ppm' : '%'}',
-              ),
-              const SizedBox(width: 10),
-              _buildParameterCard(
-                Icons.dark_mode,
-                'Night Setpoint',
-                '${nightController.text} ${label == 'CO₂' ? 'ppm' : '%'}',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        const Divider(thickness: 1),
-        const SizedBox(height: 10),
-        Text(
-          '$label Settings',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Color.fromARGB(255, 0, 0, 0),
-          ),
-        ),
-        const SizedBox(height: 10),
-        _buildSetpointInputField(
-          'Day $label (${label == 'CO₂' ? 'ppm' : '%'})',
-          dayController,
-        ),
-        _buildSetpointInputField(
-          'Night $label (${label == 'CO₂' ? 'ppm' : '%'})',
-          nightController,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1113,13 +973,11 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
     return InkWell(
       onTap: () {
         if (widget.iconData == Icons.settings) {
-          // Navigate to Settings page
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const SettingsPage()),
           );
         } else if (widget.iconData == Icons.notifications_none) {
-          // Navigate to Notifications page
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -1136,18 +994,16 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              _isPressed
-                  ? const Color.fromARGB(255, 109, 109, 109)
-                  : Colors.transparent,
+          color: _isPressed
+              ? const Color.fromARGB(255, 109, 109, 109)
+              : Colors.transparent,
         ),
         child: Icon(
           widget.iconData,
           size: 24,
-          color:
-              _isPressed
-                  ? const Color.fromRGBO(255, 255, 255, 1)
-                  : const Color.fromARGB(221, 0, 0, 0),
+          color: _isPressed
+              ? const Color.fromRGBO(255, 255, 255, 1)
+              : const Color.fromARGB(221, 0, 0, 0),
         ),
       ),
     );
