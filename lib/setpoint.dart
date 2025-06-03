@@ -44,17 +44,19 @@ class CustomThumbShape extends RoundSliderThumbShape {
     final Canvas canvas = context.canvas;
 
     // Draw the white filled circle inside (full radius)
-    final Paint fillPaint = Paint()
-      ..color = sliderTheme.thumbColor ?? Colors.white
-      ..style = PaintingStyle.fill;
+    final Paint fillPaint =
+        Paint()
+          ..color = sliderTheme.thumbColor ?? Colors.white
+          ..style = PaintingStyle.fill;
 
     canvas.drawCircle(center, enabledThumbRadius, fillPaint);
 
     // Draw the blue outline circle (stroke centered on radius - half stroke width)
-    final Paint outlinePaint = Paint()
-      ..color = outlineColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = outlineWidth;
+    final Paint outlinePaint =
+        Paint()
+          ..color = outlineColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = outlineWidth;
 
     canvas.drawCircle(
       center,
@@ -67,9 +69,10 @@ class CustomThumbShape extends RoundSliderThumbShape {
 class SetpointPageState extends State<SetpointPage> {
   String selectedPeriod = 'day'; // day or night selection
   bool isSubmitting = false; // Track submission state
-  String deviceId = '1'; // Replace with actual device ID - could be from user selection or storage
+  String deviceId =
+      '1'; // Replace with actual device ID - could be from user selection or storage
   StreamSubscription<Map<String, dynamic>>? _callbackSubscription;
-  
+
   // Store pending setpoint values to apply after gateway confirmation
   Map<String, dynamic>? _pendingSetpoints;
 
@@ -77,7 +80,8 @@ class SetpointPageState extends State<SetpointPage> {
   final TextEditingController _tempController = TextEditingController();
   final TextEditingController _humidityController = TextEditingController();
   final TextEditingController _co2Controller = TextEditingController();
-  final TextEditingController _lightIntensityController = TextEditingController();
+  final TextEditingController _lightIntensityController =
+      TextEditingController();
 
   // Light mode for current selection
   int currentLightMode = 1; // Default light mode
@@ -114,29 +118,30 @@ class SetpointPageState extends State<SetpointPage> {
     ).listen(
       (callbackData) {
         print('📡 Gateway callback received: $callbackData');
-        
+
         // Handle different types of callbacks
         if (callbackData['message'] != null) {
           final message = callbackData['message'] as String;
-          
+
           // Handle specific callback types
           if (message.contains('Setpoint settings received')) {
             print('✅ Gateway confirmed setpoint reception');
-            
+
             // Now update local variables since gateway confirmed
             if (_pendingSetpoints != null) {
               _applyPendingSetpoints();
             }
-            
+
             // Show success notification
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('✅ ${_pendingSetpoints?['period']} setpoints applied successfully!'),
+                content: Text(
+                  '✅ ${_pendingSetpoints?['period']} setpoints applied successfully!',
+                ),
                 backgroundColor: Colors.green,
                 duration: const Duration(seconds: 3),
               ),
             );
-            
           } else if (message.contains('Camera command received')) {
             print('✅ Gateway confirmed camera command reception');
             ScaffoldMessenger.of(context).showSnackBar(
@@ -176,7 +181,7 @@ class SetpointPageState extends State<SetpointPage> {
   /// Apply pending setpoints to local variables after gateway confirmation
   void _applyPendingSetpoints() {
     if (_pendingSetpoints == null) return;
-    
+
     setState(() {
       final period = _pendingSetpoints!['period'];
       final newTemp = _pendingSetpoints!['temperature'];
@@ -185,12 +190,12 @@ class SetpointPageState extends State<SetpointPage> {
       final lightMode = _pendingSetpoints!['lightMode'];
       final newLightIntensity = _pendingSetpoints!['lightIntensity'];
       final pwmValues = _pendingSetpoints!['pwmValues'];
-      
+
       if (period == 'day') {
         dayTemperature = newTemp;
         dayHumidity = newHumidity;
         dayCO2 = newCO2;
-        
+
         // Update day light settings
         if (lightMode == 6) {
           dayLightMode = 'Manual';
@@ -213,7 +218,7 @@ class SetpointPageState extends State<SetpointPage> {
         nightTemperature = newTemp;
         nightHumidity = newHumidity;
         nightCO2 = newCO2;
-        
+
         // Update night light settings
         if (lightMode == 6) {
           nightLightMode = 'Manual';
@@ -233,7 +238,7 @@ class SetpointPageState extends State<SetpointPage> {
           }
         }
       }
-      
+
       // Clear pending setpoints
       _pendingSetpoints = null;
     });
@@ -246,14 +251,15 @@ class SetpointPageState extends State<SetpointPage> {
       _humidityController.text = dayHumidity.toString();
       _co2Controller.text = dayCO2.toString();
       _lightIntensityController.text = dayLightIntensity.toString();
-      
+
       // Update light mode
       if (dayLightMode == 'Manual') {
         currentLightMode = 6;
       } else {
-        currentLightMode = int.tryParse(dayLightMode.replaceAll('Mode ', '')) ?? 1;
+        currentLightMode =
+            int.tryParse(dayLightMode.replaceAll('Mode ', '')) ?? 1;
       }
-      
+
       // Update PWM values for manual mode
       currentParPWM = parDayPWM;
       currentRedPWM = redDayPWM;
@@ -265,14 +271,15 @@ class SetpointPageState extends State<SetpointPage> {
       _humidityController.text = nightHumidity.toString();
       _co2Controller.text = nightCO2.toString();
       _lightIntensityController.text = nightLightIntensity.toString();
-      
+
       // Update light mode
       if (nightLightMode == 'Manual') {
         currentLightMode = 6;
       } else {
-        currentLightMode = int.tryParse(nightLightMode.replaceAll('Mode ', '')) ?? 1;
+        currentLightMode =
+            int.tryParse(nightLightMode.replaceAll('Mode ', '')) ?? 1;
       }
-      
+
       // Update PWM values for manual mode
       currentParPWM = parNightPWM;
       currentRedPWM = redNightPWM;
@@ -324,14 +331,15 @@ class SetpointPageState extends State<SetpointPage> {
                         Image.asset(
                           'assets/smartfarm_logo.png',
                           height: 58,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.image_not_supported),
+                          errorBuilder:
+                              (context, error, stackTrace) =>
+                                  const Icon(Icons.image_not_supported),
                         ),
                         HoverCircleIcon(iconData: Icons.notifications_none),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    
+
                     // Page Title
                     const Align(
                       alignment: Alignment.center,
@@ -369,11 +377,14 @@ class SetpointPageState extends State<SetpointPage> {
                                 });
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: selectedPeriod == 'day' 
-                                      ? Colors.blue 
-                                      : Colors.transparent,
+                                  color:
+                                      selectedPeriod == 'day'
+                                          ? Colors.blue
+                                          : Colors.transparent,
                                   borderRadius: const BorderRadius.only(
                                     topLeft: Radius.circular(12),
                                     bottomLeft: Radius.circular(12),
@@ -384,9 +395,10 @@ class SetpointPageState extends State<SetpointPage> {
                                   children: [
                                     Icon(
                                       Icons.sunny,
-                                      color: selectedPeriod == 'day'
-                                          ? Colors.white
-                                          : const Color(0xFFFFA726),
+                                      color:
+                                          selectedPeriod == 'day'
+                                              ? Colors.white
+                                              : const Color(0xFFFFA726),
                                       size: 24,
                                     ),
                                     const SizedBox(width: 8),
@@ -395,9 +407,10 @@ class SetpointPageState extends State<SetpointPage> {
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
-                                        color: selectedPeriod == 'day'
-                                            ? Colors.white
-                                            : Colors.grey[700],
+                                        color:
+                                            selectedPeriod == 'day'
+                                                ? Colors.white
+                                                : Colors.grey[700],
                                       ),
                                     ),
                                   ],
@@ -414,11 +427,14 @@ class SetpointPageState extends State<SetpointPage> {
                                 });
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: selectedPeriod == 'night' 
-                                      ? Colors.blue 
-                                      : Colors.transparent,
+                                  color:
+                                      selectedPeriod == 'night'
+                                          ? Colors.blue
+                                          : Colors.transparent,
                                   borderRadius: const BorderRadius.only(
                                     topRight: Radius.circular(12),
                                     bottomRight: Radius.circular(12),
@@ -429,9 +445,10 @@ class SetpointPageState extends State<SetpointPage> {
                                   children: [
                                     Icon(
                                       Icons.dark_mode,
-                                      color: selectedPeriod == 'night'
-                                          ? Colors.white
-                                          : const Color(0xFF90A4AE),
+                                      color:
+                                          selectedPeriod == 'night'
+                                              ? Colors.white
+                                              : const Color(0xFF90A4AE),
                                       size: 24,
                                     ),
                                     const SizedBox(width: 8),
@@ -440,9 +457,10 @@ class SetpointPageState extends State<SetpointPage> {
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
-                                        color: selectedPeriod == 'night'
-                                            ? Colors.white
-                                            : Colors.grey[700],
+                                        color:
+                                            selectedPeriod == 'night'
+                                                ? Colors.white
+                                                : Colors.grey[700],
                                       ),
                                     ),
                                   ],
@@ -485,8 +503,6 @@ class SetpointPageState extends State<SetpointPage> {
                     // Light Section
                     _buildLightSection(),
 
-                    const SizedBox(height: 30),
-
                     // Submit Button
                     SizedBox(
                       width: MediaQuery.of(context).size.width,
@@ -494,35 +510,36 @@ class SetpointPageState extends State<SetpointPage> {
                         style: FilledButton.styleFrom(
                           backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 9),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                         onPressed: isSubmitting ? null : _submitSetpoints,
-                        child: isSubmitting
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.send, color: Colors.white),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    "Submit Setpoints",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                        child:
+                            isSubmitting
+                                ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
                                   ),
-                                ],
-                              ),
+                                )
+                                : const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.send, color: Colors.white),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Submit Setpoints",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                       ),
                     ),
 
@@ -551,11 +568,7 @@ class SetpointPageState extends State<SetpointPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -598,7 +611,7 @@ class SetpointPageState extends State<SetpointPage> {
 
   Widget _buildLightSection() {
     final double screenWidth = MediaQuery.of(context).size.width;
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
@@ -606,11 +619,7 @@ class SetpointPageState extends State<SetpointPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       child: Column(
@@ -622,10 +631,7 @@ class SetpointPageState extends State<SetpointPage> {
               SizedBox(width: 12),
               Text(
                 'Light',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -634,9 +640,13 @@ class SetpointPageState extends State<SetpointPage> {
           // Light Mode Dropdown
           DropdownButtonHideUnderline(
             child: DropdownButton2<String>(
+              isExpanded: true,
+              // alignment: AlignmentDirectional.centerStart, // This was tried
               buttonStyleData: ButtonStyleData(
-                width: screenWidth,
-                padding: const EdgeInsets.only(left: 20, right: 20),
+                padding: const EdgeInsets.only(
+                  left: 0,
+                  right: 8,
+                ), // This padding is still active
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   color: Colors.transparent,
@@ -650,29 +660,51 @@ class SetpointPageState extends State<SetpointPage> {
               ),
               iconStyleData: const IconStyleData(
                 icon: Icon(Icons.arrow_drop_down_rounded),
-                iconSize: 30,
+                iconSize: 25,
                 openMenuIcon: Icon(Icons.arrow_drop_up_rounded),
                 iconEnabledColor: Colors.blue,
               ),
               value: currentModeDescription,
+              // Add selectedItemBuilder here
+              selectedItemBuilder: (BuildContext context) {
+                // Assuming 'modeDescriptions' is the List<String> that backs your dropdown items
+                return modeDescriptions.map((String item) {
+                  return Align(
+                    alignment:
+                        AlignmentDirectional
+                            .centerStart, // Aligns the Text widget to the start
+                    child: Text(
+                      item,
+                      overflow:
+                          TextOverflow.ellipsis, // Handles long text gracefully
+                      // You can also specify a TextStyle if needed:
+                      // style: TextStyle(fontSize: 16, color: Colors.black),
+                    ),
+                  );
+                }).toList();
+              },
               onChanged: (String? newValue) {
                 if (newValue == null) return;
 
                 setState(() {
                   if (newValue.startsWith('Mode ')) {
-                    final modeNumberString = newValue.split(':')[0].split(' ')[1];
-                    currentLightMode = int.tryParse(modeNumberString) ?? currentLightMode;
+                    final modeNumberString =
+                        newValue.split(':')[0].split(' ')[1];
+                    currentLightMode =
+                        int.tryParse(modeNumberString) ?? currentLightMode;
                   } else if (newValue == 'Manual') {
                     currentLightMode = 6;
                   }
                 });
               },
-              items: modeDescriptions.map<DropdownMenuItem<String>>((String mode) {
-                return DropdownMenuItem<String>(
-                  value: mode,
-                  child: Text(mode),
-                );
-              }).toList(),
+              items:
+                  modeDescriptions.map<DropdownMenuItem<String>>((String mode) {
+                    return DropdownMenuItem<String>(
+                      value: mode,
+                      // This child is for the items in the dropdown menu itself
+                      child: Text(mode),
+                    );
+                  }).toList(),
             ),
           ),
 
@@ -682,7 +714,9 @@ class SetpointPageState extends State<SetpointPage> {
           if (currentLightMode != 5 && currentLightMode != 6) ...[
             TextField(
               controller: _lightIntensityController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: 'Light Intensity (LUX)',
                 labelStyle: const TextStyle(color: Colors.black54),
@@ -700,12 +734,11 @@ class SetpointPageState extends State<SetpointPage> {
 
           // Manual PWM Sliders for Mode 6
           if (currentLightMode == 6) ...[
-            const SizedBox(height: 16),
-            const Text(
-              'Manual Light Control',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 5),
+            const Center(
+              child: Text(
+                'Manual Light Control',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 16),
@@ -782,14 +815,11 @@ class SetpointPageState extends State<SetpointPage> {
     Color outlineColor = Colors.blue,
   }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
@@ -835,7 +865,9 @@ class SetpointPageState extends State<SetpointPage> {
     if (_tempController.text.isEmpty ||
         _humidityController.text.isEmpty ||
         _co2Controller.text.isEmpty ||
-        (currentLightMode != 5 && currentLightMode != 6 && _lightIntensityController.text.isEmpty)) {
+        (currentLightMode != 5 &&
+            currentLightMode != 6 &&
+            _lightIntensityController.text.isEmpty)) {
       _showErrorDialog('Please fill in all required fields.');
       return;
     }
@@ -844,11 +876,14 @@ class SetpointPageState extends State<SetpointPage> {
     final double? newTemp = double.tryParse(_tempController.text);
     final double? newHumidity = double.tryParse(_humidityController.text);
     final double? newCO2 = double.tryParse(_co2Controller.text);
-    final double? newLightIntensity = currentLightMode != 5 && currentLightMode != 6 
-        ? double.tryParse(_lightIntensityController.text) 
-        : (currentLightMode == 5 ? 0 : null);
+    final double? newLightIntensity =
+        currentLightMode != 5 && currentLightMode != 6
+            ? double.tryParse(_lightIntensityController.text)
+            : (currentLightMode == 5 ? 0 : null);
 
-    if (newTemp == null || newHumidity == null || newCO2 == null ||
+    if (newTemp == null ||
+        newHumidity == null ||
+        newCO2 == null ||
         (currentLightMode != 6 && newLightIntensity == null)) {
       _showErrorDialog('Please enter valid numeric values.');
       return;
@@ -884,7 +919,7 @@ class SetpointPageState extends State<SetpointPage> {
 
     try {
       bool success = false;
-      
+
       if (selectedPeriod == 'day') {
         success = await SetpointService.sendDaySetpoints(
           deviceId: deviceId,
@@ -918,17 +953,21 @@ class SetpointPageState extends State<SetpointPage> {
           'lightIntensity': newLightIntensity ?? 0,
           'pwmValues': pwmValues,
         };
-        
+
         // Just show that the API call was successful
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('⏳ Setpoints sent to server, waiting for gateway confirmation...'),
+            content: const Text(
+              '⏳ Setpoints sent to server, waiting for gateway confirmation...',
+            ),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 3),
           ),
         );
       } else {
-        _showErrorDialog('Failed to send setpoints to gateway. Please try again.');
+        _showErrorDialog(
+          'Failed to send setpoints to gateway. Please try again.',
+        );
       }
     } catch (e) {
       _showErrorDialog('Network error: ${e.toString()}');
@@ -942,16 +981,17 @@ class SetpointPageState extends State<SetpointPage> {
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Error'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 }
@@ -994,16 +1034,18 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: _isPressed
-              ? const Color.fromARGB(255, 109, 109, 109)
-              : Colors.transparent,
+          color:
+              _isPressed
+                  ? const Color.fromARGB(255, 109, 109, 109)
+                  : Colors.transparent,
         ),
         child: Icon(
           widget.iconData,
           size: 24,
-          color: _isPressed
-              ? const Color.fromRGBO(255, 255, 255, 1)
-              : const Color.fromARGB(221, 0, 0, 0),
+          color:
+              _isPressed
+                  ? const Color.fromRGBO(255, 255, 255, 1)
+                  : const Color.fromARGB(221, 0, 0, 0),
         ),
       ),
     );

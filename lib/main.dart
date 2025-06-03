@@ -10,7 +10,9 @@ import 'login.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
+    _,
+  ) {
     // Set status bar color to transparent
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
@@ -32,6 +34,7 @@ class SmartFarmApp extends StatelessWidget {
       title: 'SmartFarm',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         scaffoldBackgroundColor: Colors.white,
         fontFamily: GoogleFonts.nunito().fontFamily,
       ),

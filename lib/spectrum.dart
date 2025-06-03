@@ -1,16 +1,110 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Import the chart library for graphs
+import 'dart:async'; // Import for Timer
 import 'variables.dart'; // Import the variables file containing data arrays and labels
 import 'settings.dart';
 import 'notifications_loader.dart';
 
-class SpectrumPage extends StatelessWidget {
+class SpectrumPage extends StatefulWidget {
   const SpectrumPage({super.key});
+
+  @override
+  State<SpectrumPage> createState() => _SpectrumPageState();
+}
+
+class _SpectrumPageState extends State<SpectrumPage> {
+  bool _isTakingSpectrumReadings = false;
+  late ScrollController _scrollController;
+  bool _isScrolledToBottom = false;
+
+  // To simulate taking readings
+  Timer? _spectrumReadingTimer;
+
+  static const double _bottomPaddingForButton =
+      65; // button height + padding + extra space
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
+    // Call scroll listener once after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _scrollListener();
+      }
+    });
+  }
+
+  void _scrollListener() {
+    if (!mounted ||
+        !_scrollController.hasClients ||
+        !_scrollController.position.hasContentDimensions) {
+      if (_isScrolledToBottom) {
+        setState(() {
+          _isScrolledToBottom = false;
+        });
+      }
+      return;
+    }
+
+    bool isScrollable = _scrollController.position.maxScrollExtent > 0.0;
+
+    if (isScrollable) {
+      final isAtBottom =
+          _scrollController.position.pixels >=
+          (_scrollController.position.maxScrollExtent - 0.5);
+      if (isAtBottom != _isScrolledToBottom) {
+        setState(() {
+          _isScrolledToBottom = isAtBottom;
+        });
+      }
+    } else {
+      // If not scrollable, consider it as "scrolled to bottom" for button width
+      if (!_isScrolledToBottom) {
+        setState(() {
+          _isScrolledToBottom = true;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
+    _spectrumReadingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _takeSpectrumReadings() async {
+    if (!mounted) return;
+    setState(() {
+      _isTakingSpectrumReadings = true;
+    });
+
+    // Simulate an async operation
+    _spectrumReadingTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✔️ Successfully took new spectrum readings!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        setState(() {
+          _isTakingSpectrumReadings = false;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
     final double screenHeight = MediaQuery.of(context).size.height;
+    final double horizontalPadding = screenWidth * 0.04;
 
     return Stack(
       children: [
@@ -27,136 +121,188 @@ class SpectrumPage extends StatelessWidget {
         Scaffold(
           backgroundColor: Colors.transparent,
           body: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Top bar with settings, logo, notifications
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Stack(
+              // Stack to overlay button on content
+              children: [
+                Padding(
+                  // Main content padding
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
                       children: [
-                        HoverCircleIcon(iconData: Icons.settings),
-                        Image.asset(
-                          'assets/smartfarm_logo.png',
-                          height: 58,
-                          errorBuilder:
-                              (context, error, stackTrace) =>
-                                  const Icon(Icons.image_not_supported),
-                        ),
-                        HoverCircleIcon(iconData: Icons.notifications_none),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    // Title centered
-                    Align(
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'Spectrometer',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // Display Expected Spectrum (Graph)
-                    _buildGraphSection(
-                      'Expected Spectrum',
-                      expectedSpectrumValues,
-                      wavelength, // Use wavelength for the x-axis labels
-                    ),
-                    const SizedBox(height: 0),
-                    // Display "Spectrometer Image" Title
-                    Align(
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'Spectrometer Image',
-                        style: TextStyle(
-                          fontWeight: FontWeight.normal,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    // Display Spectrometer Image with crop focus and rounded corners
-                    Container(
-                      margin: EdgeInsets.symmetric(vertical: 0),
-                      height: screenHeight * 0.3,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(
-                          12,
-                        ), // Rounded rectangle shape
-                        child: Image.asset(
-                          'assets/spectrometer_image.png',
-                          fit: BoxFit.cover,
-                          width:
-                              screenWidth, // Make sure the image fills the container
-                          height: screenHeight * 0.3,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Display Obtained Spectrum (Graph)
-                    _buildGraphSection(
-                      'Obtained Spectrum',
-                      obtainedSpectrumValues,
-                      wavelength, // Same wavelength for consistency
-                    ),
-
-                    // Add this inside the Column children in SpectrumPage, after the last _buildGraphSection call
-                    const SizedBox(height: 10),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 40,
-                      child: FilledButton(
-                        onPressed: () {
-                          // TODO: Implement take new spectrum readings functionality
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Successfully took new spectrum readings!',
-                              ),
+                        // Top bar with settings, logo, notifications
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            HoverCircleIcon(iconData: Icons.settings),
+                            Image.asset(
+                              'assets/smartfarm_logo.png',
+                              height: 58,
+                              errorBuilder:
+                                  (context, error, stackTrace) =>
+                                      const Icon(Icons.image_not_supported),
                             ),
-                          );
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(
-                              Icons
-                                  .gradient, // Use a relevant icon for spectrum readings
-                              size: 20,
-                              color: Colors.white,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Take Spectrum Readings',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            HoverCircleIcon(iconData: Icons.notifications_none),
                           ],
                         ),
+                        const SizedBox(height: 10),
+                        // Title centered
+                        const Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Spectrometer',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 24,
+                              color: Color(0xFF1A202C),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        // Display Expected Spectrum (Graph)
+                        _buildGraphSection(
+                          'Expected Spectrum',
+                          expectedSpectrumValues,
+                          wavelength, // Use wavelength for the x-axis labels
+                        ),
+                        const SizedBox(height: 0),
+                        // Display "Spectrometer Image" Title
+                        const Align(
+                          alignment: Alignment.center,
+                          child: Text(
+                            'Spectrometer Image',
+                            style: TextStyle(
+                              fontWeight: FontWeight.normal,
+                              fontSize: 18,
+                              color: Color(0xFF2D3748),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        // Display Spectrometer Image
+                        Container(
+                          margin: const EdgeInsets.symmetric(vertical: 0),
+                          height: screenHeight * 0.3,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset(
+                              'assets/spectrometer_image.png', // Ensure this asset exists
+                              fit: BoxFit.cover,
+                              width: screenWidth,
+                              height: screenHeight * 0.3,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.broken_image_outlined,
+                                        size: 48,
+                                        color: Colors.grey,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Image unavailable',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Display Obtained Spectrum (Graph)
+                        _buildGraphSection(
+                          'Obtained Spectrum',
+                          obtainedSpectrumValues,
+                          wavelength, // Same wavelength for consistency
+                        ),
+                        const SizedBox(
+                          height: _bottomPaddingForButton,
+                        ), // Padding for the floating button
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 20,
+                  left: _isScrolledToBottom ? horizontalPadding : null,
+                  right: horizontalPadding,
+                  child: Container(
+                    width:
+                        _isScrolledToBottom
+                            ? screenWidth - (horizontalPadding * 2)
+                            : null,
+                    child: FilledButton.icon(
+                      onPressed:
+                          _isTakingSpectrumReadings
+                              ? null
+                              : _takeSpectrumReadings,
+                      icon:
+                          _isTakingSpectrumReadings
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Icon(
+                                Icons.gradient, // Icon for spectrum
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                      label: Text(
+                        _isTakingSpectrumReadings
+                            ? 'Reading...'
+                            : 'Take Spectrum',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        disabledBackgroundColor: Colors.blue.withOpacity(0.7),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+                        elevation: 4.0,
+                        minimumSize:
+                            _isScrolledToBottom
+                                ? const Size(
+                                  double.infinity,
+                                  0,
+                                ) // Full width when scrolled to bottom
+                                : null, // Default width otherwise
                       ),
                     ),
-                    const SizedBox(height: 20),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -164,31 +310,33 @@ class SpectrumPage extends StatelessWidget {
     );
   }
 
-  // Function to build graphs for Expected and Obtained Spectra
   Widget _buildGraphSection(
     String title,
     List<double> yValues,
     List<double> xLabels,
   ) {
-    // Calculate min and max Y with padding for better graph appearance
-    final double minY = yValues.reduce((a, b) => a < b ? a : b) - 5;
-    final double maxY = yValues.reduce((a, b) => a > b ? a : b) + 5;
+    final double minY =
+        yValues.isEmpty ? 0 : yValues.reduce((a, b) => a < b ? a : b) - 5;
+    final double maxY =
+        yValues.isEmpty ? 10 : yValues.reduce((a, b) => a > b ? a : b) + 5;
 
     return Column(
       children: [
-        // Section title
         Align(
           alignment: Alignment.center,
           child: Text(
             title,
-            style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 18),
+            style: const TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: 18,
+              color: Color(0xFF2D3748),
+            ),
           ),
         ),
         const SizedBox(height: 5),
-        // Graph container with horizontal scrolling
         Container(
-          height: 220, // Adjusted for compact appearance
-          padding: const EdgeInsets.all(4), // Reduced padding
+          height: 220,
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -201,59 +349,51 @@ class SpectrumPage extends StatelessWidget {
             ],
           ),
           child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal, // Enable horizontal scroll
+            scrollDirection: Axis.horizontal,
             child: SizedBox(
-              width:
-                  (xLabels.length + 1) *
-                  45.0, // Reduced width for tighter spacing
+              width: (xLabels.length + 1) * 45.0,
               child: LineChart(
                 LineChartData(
-                  gridData: FlGridData(show: true), // Show grid lines
+                  gridData: const FlGridData(show: true),
                   titlesData: FlTitlesData(
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 25,
-                        interval:
-                            1, // Reduced interval for more frequent X labels
+                        interval: 1,
                         getTitlesWidget: (value, meta) {
                           int index = value.toInt();
-                          // Display the time labels only for the defined data points
                           if (index >= 0 && index < xLabels.length) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                // Time labels
-                                xLabels[index].toString(),
+                                xLabels[index].toStringAsFixed(
+                                  0,
+                                ), // Format wavelength
                                 style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize:
-                                      10, // Smaller font size for tighter spacing
+                                  color: Colors.black54,
+                                  fontSize: 10,
                                 ),
                               ),
                             );
                           }
-                          return const SizedBox.shrink(); // Empty widget for gaps
+                          return const SizedBox.shrink();
                         },
                       ),
                     ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: false, // Hide y-axis labels as requested
-                      ),
-                    ),
-                    topTitles: AxisTitles(
+                    leftTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false),
                     ),
-                    rightTitles: AxisTitles(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false),
                     ),
                   ),
-                  borderData: FlBorderData(show: false), // Hide border
-                  minX: 0.0, // Start from the first data point
-                  maxX:
-                      (xLabels.length - 1)
-                          .toDouble(), // End at the last data point
+                  borderData: FlBorderData(show: false),
+                  minX: 0.0,
+                  maxX: (xLabels.length - 1).toDouble(),
                   minY: minY,
                   maxY: maxY,
                   lineBarsData: [
@@ -263,14 +403,14 @@ class SpectrumPage extends StatelessWidget {
                         (index) => FlSpot(index.toDouble(), yValues[index]),
                       ),
                       isCurved: true,
-                      color: Colors.blue, // Line color
-                      dotData: FlDotData(show: true),
+                      color: Colors.blue,
+                      dotData: const FlDotData(show: true),
                       belowBarData: BarAreaData(
                         show: true,
                         gradient: LinearGradient(
                           colors: [
-                            Color.fromRGBO(33, 150, 243, 0.3),
-                            Color.fromRGBO(33, 150, 243, 0.1),
+                            const Color.fromRGBO(33, 150, 243, 0.3),
+                            const Color.fromRGBO(33, 150, 243, 0.1),
                           ],
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
@@ -283,7 +423,7 @@ class SpectrumPage extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 15), // Reduced spacing between sections
+        SizedBox(height: 20),
       ],
     );
   }
@@ -299,20 +439,19 @@ class HoverCircleIcon extends StatefulWidget {
 }
 
 class _HoverCircleIconState extends State<HoverCircleIcon> {
-  final bool _isPressed = false;
+  // _isPressed state was unused, it's removed for cleanliness as InkWell handles visual feedback.
+  // If custom press effects beyond InkWell are needed, it can be re-added.
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
         if (widget.iconData == Icons.settings) {
-          // Navigate to Settings page
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const SettingsPage()),
           );
         } else if (widget.iconData == Icons.notifications_none) {
-          // Navigate to Notifications page
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -321,26 +460,16 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
           );
         }
       },
-      borderRadius: BorderRadius.circular(50),
+      borderRadius: BorderRadius.circular(50), // For circular splash effect
       splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
       highlightColor: const Color.fromRGBO(0, 123, 255, 0.1),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Padding(
+        // Use Padding instead of AnimatedContainer if no animation on _isPressed
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color:
-              _isPressed
-                  ? const Color.fromARGB(255, 109, 109, 109)
-                  : Colors.transparent,
-        ),
         child: Icon(
           widget.iconData,
           size: 24,
-          color:
-              _isPressed
-                  ? const Color.fromARGB(255, 255, 255, 255)
-                  : const Color.fromARGB(221, 0, 0, 0),
+          color: const Color.fromARGB(221, 0, 0, 0), // Default color
         ),
       ),
     );

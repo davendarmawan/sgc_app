@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:intl/intl.dart'; // Import the intl package
+// Assuming these files exist in your project structure and will be created by the user
 import 'settings.dart';
 import 'notifications_loader.dart';
 import 'services/setpoint_service.dart';
@@ -16,70 +18,116 @@ class CameraPage extends StatefulWidget {
 
 class _CameraPageState extends State<CameraPage> {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
-  
+
   // Configuration
-  static const String _baseUrl = 'https://demo.smartfarm.id'; // Replace with your actual base URL
+  static const String _baseUrl =
+      'https://demo.smartfarm.id'; // Replace with your actual base URL
   static const String _deviceId = '1'; // Replace with actual device ID
-  
+
   // Loading states
   bool _isLoadingImages = true;
   bool _isTakingPhoto = false;
-  
+
   // Image data
   Map<String, List<CameraImage>> _cameraImages = {
     'top': [],
     'bottom': [],
     'user': [],
   };
-  
+
   // Error states
   String? _errorMessage;
+
+  // Timer for reloading images after taking a photo
+  Timer? _photoReloadTimer;
+
+  // Scroll controller to detect scroll position
+  late ScrollController _scrollController;
+  bool _isScrolledToBottom = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
     _loadAllCameraImages();
   }
 
-  /// Load all camera images from API endpoints
+  void _scrollListener() {
+    if (!mounted ||
+        !_scrollController.hasClients ||
+        !_scrollController.position.hasContentDimensions) {
+      if (_isScrolledToBottom) {
+        setState(() {
+          _isScrolledToBottom = false;
+        });
+      }
+      return;
+    }
+
+    bool isScrollable = _scrollController.position.maxScrollExtent > 0.0;
+
+    if (isScrollable) {
+      final isAtBottom =
+          _scrollController.position.pixels >=
+          (_scrollController.position.maxScrollExtent - 0.5);
+      if (isAtBottom != _isScrolledToBottom) {
+        setState(() {
+          _isScrolledToBottom = isAtBottom;
+        });
+      }
+    } else {
+      if (_isScrolledToBottom) {
+        setState(() {
+          _isScrolledToBottom = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
+    _photoReloadTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadAllCameraImages() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingImages = true;
       _errorMessage = null;
     });
 
     try {
-      // Get authentication token
       String? jwtToken = await _secureStorage.read(key: 'jwt_token');
-      
       if (jwtToken == null) {
         throw Exception('Authentication required. Please login again.');
       }
-
       final headers = {
         'Authorization': 'Bearer $jwtToken',
         'Accept': 'application/json',
       };
 
-      // Fetch images from all three endpoints concurrently
       final List<Future<List<CameraImage>>> futures = [
         _fetchCameraImages('top', headers),
         _fetchCameraImages('bottom', headers),
         _fetchCameraImages('user', headers),
       ];
-
       final List<List<CameraImage>> results = await Future.wait(futures);
 
+      if (!mounted) return;
       setState(() {
         _cameraImages['top'] = results[0];
         _cameraImages['bottom'] = results[1];
         _cameraImages['user'] = results[2];
         _isLoadingImages = false;
       });
-
       print('✅ Successfully loaded camera images');
     } catch (e) {
       print('❌ Error loading camera images: $e');
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
         _isLoadingImages = false;
@@ -87,8 +135,11 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
-  /// Fetch camera images for a specific position
-  Future<List<CameraImage>> _fetchCameraImages(String position, Map<String, String> headers) async {
+  Future<List<CameraImage>> _fetchCameraImages(
+    String position,
+    Map<String, String> headers,
+  ) async {
+    print('🔄 Fetching $position camera images...');
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/file/list$position/$_deviceId'),
@@ -97,56 +148,46 @@ class _CameraPageState extends State<CameraPage> {
 
       if (response.statusCode == 200) {
         final dynamic data = json.decode(response.body);
-        
-        // Debug: Print the actual API response
-        print('🔍 API Response for $position:');
-        print('Type: ${data.runtimeType}');
-        print('Content: $data');
-        
-        // Handle different response formats
+        print(
+          '🔍 API Response for $position: Type: ${data.runtimeType}, Content: $data',
+        );
+
         List<dynamic> imageList;
-        
         if (data is List) {
-          // Response is already a list
           imageList = data;
-          print('✅ Response is List with ${imageList.length} items');
         } else if (data is Map<String, dynamic>) {
-          // Response is an object, check for common array properties
-          print('📦 Response is Map with keys: ${data.keys.toList()}');
-          
           if (data.containsKey('data') && data['data'] is List) {
             imageList = data['data'];
-            print('✅ Found data array with ${imageList.length} items');
           } else if (data.containsKey('files') && data['files'] is List) {
             imageList = data['files'];
-            print('✅ Found files array with ${imageList.length} items');
           } else if (data.containsKey('images') && data['images'] is List) {
             imageList = data['images'];
-            print('✅ Found images array with ${imageList.length} items');
           } else if (data.containsKey('result') && data['result'] is List) {
             imageList = data['result'];
-            print('✅ Found result array with ${imageList.length} items');
           } else {
-            // If it's a single object, wrap it in a list
-            imageList = [data];
-            print('⚠️ Wrapping single object in list');
+            imageList = [];
           }
         } else {
-          throw Exception('Unexpected response format for $position camera images');
+          throw Exception(
+            'Unexpected response format for $position camera images: ${data.runtimeType}',
+          );
         }
-        
-        final List<CameraImage> cameraImages = imageList.map((item) => CameraImage.fromJson(item)).toList();
-        
-        // Debug: Print image paths
-        print('🖼️ Images for $position:');
-        for (int i = 0; i < cameraImages.length; i++) {
-          print('  [$i] ${cameraImages[i].filename} -> ${cameraImages[i].imagePath}');
-          print('      Full URL: $_baseUrl${cameraImages[i].imagePath}');
-        }
-        
+
+        final List<CameraImage> cameraImages =
+            imageList
+                .map((item) {
+                  if (item is Map<String, dynamic>) {
+                    return CameraImage.fromJson(item);
+                  }
+                  return null;
+                })
+                .whereType<CameraImage>()
+                .toList();
         return cameraImages;
       } else {
-        throw Exception('Failed to load $position camera images: ${response.statusCode}');
+        throw Exception(
+          'Failed to load $position camera images: ${response.statusCode}, Body: ${response.body}',
+        );
       }
     } catch (e) {
       print('❌ Error fetching $position camera images: $e');
@@ -154,40 +195,50 @@ class _CameraPageState extends State<CameraPage> {
     }
   }
 
-  /// Send camera capture command to gateway
   Future<void> _takeCameraPhotos() async {
+    if (!mounted) return;
     setState(() {
       _isTakingPhoto = true;
     });
 
     try {
-      // Send camera command using SetpointService
-      bool success = await SetpointService.sendCameraCommand(deviceId: _deviceId);
-      
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('📷 Camera capture command sent to gateway!'),
-            backgroundColor: Colors.blue,
-            duration: Duration(seconds: 2),
-          ),
-        );
+      bool success = await SetpointService.sendCameraCommand(
+        deviceId: _deviceId,
+      );
+      if (!mounted) return;
 
-        // Optionally reload images after a delay to get new photos
-        Timer(const Duration(seconds: 3), () {
-          _loadAllCameraImages();
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📷 Camera capture command sent to gateway!'),
+              backgroundColor: Colors.blue,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        _photoReloadTimer?.cancel();
+        _photoReloadTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) {
+            _loadAllCameraImages();
+          }
         });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Failed to send camera command. Please try again.'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '❌ Failed to send camera command. Please try again.',
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('❌ Error taking photos: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ Error: ${e.toString()}'),
@@ -196,19 +247,21 @@ class _CameraPageState extends State<CameraPage> {
         ),
       );
     } finally {
-      setState(() {
-        _isTakingPhoto = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isTakingPhoto = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
+    final double horizontalPadding = screenWidth * 0.04;
 
     return Stack(
       children: [
-        // Gradient background
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -221,118 +274,81 @@ class _CameraPageState extends State<CameraPage> {
         Scaffold(
           backgroundColor: Colors.transparent,
           body: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
-              child: Column(
-                children: [
-                  // Top bar with settings, logo, notifications
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Stack(
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: Column(
+                    // This Column now only holds the Expanded RefreshIndicator
                     children: [
-                      HoverCircleIcon(iconData: Icons.settings),
-                      Image.asset(
-                        'assets/smartfarm_logo.png',
-                        height: 58,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.image_not_supported),
-                      ),
-                      HoverCircleIcon(iconData: Icons.notifications_none),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  
-                  // Title centered with refresh button
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Camera',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                      // The Header Row and its SizedBox were removed from here
+                      Expanded(
+                        child: RefreshIndicator(
+                          onRefresh: _loadAllCameraImages,
+                          color: Colors.white,
+                          backgroundColor: Colors.blue,
+                          child: _buildScrollablePageContent(
+                            horizontalPadding,
+                          ), // Pass padding if needed by header internally, or rely on parent
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        onPressed: _isLoadingImages ? null : _loadAllCameraImages,
-                        icon: _isLoadingImages
-                            ? const SizedBox(
+                    ],
+                  ),
+                ),
+                Positioned(
+                  bottom: 20,
+                  left: _isScrolledToBottom ? horizontalPadding : null,
+                  right: horizontalPadding,
+                  child: Container(
+                    width:
+                        _isScrolledToBottom
+                            ? screenWidth - (horizontalPadding * 2)
+                            : null,
+                    child: FilledButton.icon(
+                      onPressed: _isTakingPhoto ? null : _takeCameraPhotos,
+                      icon:
+                          _isTakingPhoto
+                              ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
                               )
-                            : const Icon(Icons.refresh),
-                        tooltip: 'Refresh Images',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Content area
-                  Expanded(
-                    child: _buildContent(),
-                  ),
-
-                  // Take Photo Button
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: FilledButton(
-                        onPressed: _isTakingPhoto ? null : _takeCameraPhotos,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isTakingPhoto
-                            ? const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Taking Photos...',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.camera_alt,
-                                    size: 24,
-                                    color: Colors.white,
-                                  ),
-                                  SizedBox(width: 12),
-                                  Text(
-                                    'Take Photos',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                              : const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 18,
                               ),
+                      label: Text(
+                        _isTakingPhoto ? 'Taking...' : 'Take Photos',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        disabledBackgroundColor: Colors.blue.withOpacity(0.7),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
+                        ),
+                        elevation: 4.0,
+                        minimumSize:
+                            _isScrolledToBottom
+                                ? const Size(double.infinity, 0)
+                                : null,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -340,70 +356,130 @@ class _CameraPageState extends State<CameraPage> {
     );
   }
 
-  Widget _buildContent() {
-    if (_errorMessage != null) {
-      return _buildErrorState();
-    }
-
-    if (_isLoadingImages) {
-      return _buildLoadingState();
-    }
-
-    return _buildImageGrid();
+  // Accept horizontalPadding if needed, though the parent Padding widget in build() might already handle it
+  Widget _buildScrollablePageContent(double horizontalPadding) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _scrollListener();
+      }
+    });
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        children: [
+          // Header Row is now the first item in the scrollable content
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              HoverCircleIcon(iconData: Icons.settings),
+              Image.asset(
+                'assets/smartfarm_logo.png',
+                height: 58,
+                errorBuilder:
+                    (context, error, stackTrace) =>
+                        const Icon(Icons.image_not_supported),
+              ),
+              HoverCircleIcon(iconData: Icons.notifications_none),
+            ],
+          ),
+          const SizedBox(height: 10), // Spacing after the header
+          // Original content of the scrollable page
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Camera',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                  color: Color(0xFF1A202C),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _buildDynamicContentForScroll(),
+        ],
+      ),
+    );
   }
 
-  Widget _buildLoadingState() {
-    return const Center(
+  Widget _buildDynamicContentForScroll() {
+    if (_errorMessage != null) {
+      return _buildErrorStateContent();
+    }
+    if (_isLoadingImages &&
+        _cameraImages['top']!.isEmpty &&
+        _cameraImages['bottom']!.isEmpty &&
+        _cameraImages['user']!.isEmpty) {
+      return _buildLoadingStateContent();
+    }
+    return _buildImageGridContent();
+  }
+
+  Widget _buildLoadingStateContent() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 50.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(),
+          CircularProgressIndicator(color: Colors.blue),
           SizedBox(height: 16),
           Text(
             'Loading camera images...',
-            style: TextStyle(fontSize: 16),
+            style: TextStyle(fontSize: 16, color: Color(0xFF4A5568)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
-    return Center(
+  Widget _buildErrorStateContent() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0).copyWith(top: 30, bottom: 30),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red,
-          ),
+          const Icon(Icons.error_outline, size: 64, color: Colors.redAccent),
           const SizedBox(height: 16),
           Text(
-            'Error loading images',
+            'Error Loading Images',
+            textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: Color(0xFF4A5568),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            _errorMessage!,
+            _errorMessage ?? "An unknown error occurred.",
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: Colors.red),
+            style: const TextStyle(fontSize: 14, color: Colors.redAccent),
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
+          ElevatedButton.icon(
             onPressed: _loadAllCameraImages,
-            child: const Text('Retry'),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildImageGrid() {
-    return SingleChildScrollView(
+  Widget _buildImageGridContent() {
+    const double bottomPaddingForButton = 21.0 + 60.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: bottomPaddingForButton),
       child: Column(
         children: [
           _buildImageSection(
@@ -426,7 +502,6 @@ class _CameraPageState extends State<CameraPage> {
                 ? _cameraImages['user']!.first
                 : null,
           ),
-          const SizedBox(height: 20),
         ],
       ),
     );
@@ -434,101 +509,138 @@ class _CameraPageState extends State<CameraPage> {
 
   Widget _buildImageSection(String title, CameraImage? image) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Section title with timestamp
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-            ),
-            if (image != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  image.uploadedAt,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ],
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+            color: Color(0xFF2D3748),
+          ),
         ),
+        if (image != null && image.uploadedAt.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              _formatDateTime(image.uploadedAt),
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-        
-        // Image container
         Container(
           height: 200,
+          width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color.fromARGB(31, 2, 0, 0),
+                color: Colors.grey.withOpacity(0.3),
                 blurRadius: 6,
-                offset: Offset(0, 3),
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: image != null
-                ? Image.network(
-                    '$_baseUrl${image.imagePath}',
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      print('❌ Image failed to load: $_baseUrl${image.imagePath}');
-                      return const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.broken_image, size: 48, color: Colors.grey),
-                            SizedBox(height: 8),
-                            Text('Failed to load image', style: TextStyle(color: Colors.grey)),
-                          ],
-                        ),
-                      );
-                    },
-                  )
-                : const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.camera_alt, size: 48, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('No image available', style: TextStyle(color: Colors.grey)),
-                      ],
+            child:
+                image != null && image.imagePath.isNotEmpty
+                    ? Image.network(
+                      '$_baseUrl${image.imagePath}',
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value:
+                                loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                            color: Colors.blue,
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        print(
+                          '❌ Image failed to load: $_baseUrl${image.imagePath}, Error: $error',
+                        );
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.broken_image_outlined,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Image unavailable ($title)',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    )
+                    : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.camera_alt_outlined,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No image available ($title)',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
           ),
         ),
       ],
     );
   }
+
+  String _formatDateTime(String dateTimeString) {
+    if (dateTimeString.isEmpty) return '';
+    try {
+      final DateTime dateTime = DateTime.parse(dateTimeString);
+      return DateFormat('dd MMMM yyyy HH:mm').format(dateTime);
+    } catch (e) {
+      print("Error parsing date: $dateTimeString, $e");
+      try {
+        final DateTime dateTime = DateFormat(
+          "yyyy-MM-dd HH:mm:ss",
+        ).parse(dateTimeString, true);
+        return DateFormat('dd MMMM yy HH:mm').format(dateTime);
+      } catch (e2) {
+        print("Error parsing date (fallback): $dateTimeString, $e2");
+        return dateTimeString;
+      }
+    }
+  }
 }
 
-// Model for camera image data
 class CameraImage {
   final String filename;
   final String imagePath;
@@ -544,17 +656,22 @@ class CameraImage {
 
   factory CameraImage.fromJson(Map<String, dynamic> json) {
     return CameraImage(
-      filename: json['filename'] ?? '',
-      imagePath: json['image_path'] ?? json['file_url'] ?? '', // Handle both field names
-      uploadedAt: json['uploaded_at'] ?? '',
-      deviceId: json['device_id'] ?? 0,
+      filename: json['filename'] as String? ?? '',
+      imagePath:
+          (json['image_path'] as String? ?? json['file_url'] as String?) ?? '',
+      uploadedAt: json['uploaded_at'] as String? ?? '',
+      deviceId:
+          (json['device_id'] is int
+              ? json['device_id']
+              : (json['device_id'] is String
+                  ? int.tryParse(json['device_id']) ?? 0
+                  : 0)),
     );
   }
 }
 
 class HoverCircleIcon extends StatefulWidget {
   final IconData iconData;
-
   const HoverCircleIcon({required this.iconData, super.key});
 
   @override
@@ -590,16 +707,18 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: _isPressed
-              ? const Color.fromARGB(255, 109, 109, 109)
-              : Colors.transparent,
+          color:
+              _isPressed
+                  ? const Color.fromARGB(255, 109, 109, 109)
+                  : Colors.transparent,
         ),
         child: Icon(
           widget.iconData,
           size: 24,
-          color: _isPressed
-              ? const Color.fromARGB(255, 255, 255, 255)
-              : const Color.fromARGB(221, 0, 0, 0),
+          color:
+              _isPressed
+                  ? const Color.fromARGB(255, 255, 255, 255)
+                  : const Color.fromARGB(221, 0, 0, 0),
         ),
       ),
     );

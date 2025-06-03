@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'variables.dart';
-import 'settings.dart';
-import 'nightday.dart';
-import 'notifications_loader.dart';
+import 'variables.dart'; // Assuming this file exists and contains necessary variables
+import 'settings.dart'; // Assuming this file exists
+import 'nightday.dart'; // Assuming this file exists
+import 'notifications_loader.dart'; // Assuming this file exists
 import 'package:carousel_slider_plus/carousel_slider_plus.dart';
-import 'services/liveCondition_service.dart';
+import 'services/liveCondition_service.dart'; // Assuming this file exists
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -32,7 +32,6 @@ class _HomePageState extends State<HomePage> {
     'User Camera',
   ];
 
-  // ADD THIS: Initialize the service when widget starts
   @override
   void initState() {
     super.initState();
@@ -43,7 +42,6 @@ class _HomePageState extends State<HomePage> {
   Future<void> _initializeService() async {
     print('🔄 Starting service initialization...');
     try {
-      // Get the token first
       String? jwtToken = await secureStorage.read(key: 'jwt_token');
       String? userId = await secureStorage.read(key: 'user_id');
       String? userLevel = await secureStorage.read(key: 'user_level');
@@ -57,7 +55,6 @@ class _HomePageState extends State<HomePage> {
 
       if (jwtToken != null) {
         print('✅ Token found, initializing LiveConditionService...');
-        // Now initialize the service
         liveService = LiveConditionService(
           deviceId: '1',
           baseUrl: 'https://demo.smartfarm.id',
@@ -65,14 +62,11 @@ class _HomePageState extends State<HomePage> {
         );
 
         print('📡 Starting to listen for live data...');
-        // Start listening
         liveService!.startListening().listen(
           (data) {
             print('📊 LIVE DATA RECEIVED: $data');
             if (mounted) {
-              // Check if widget is still mounted
               setState(() {
-                // Update UI - this will trigger a rebuild
                 print('🔄 UI updated with new data');
               });
             }
@@ -103,7 +97,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // ADD THIS: Clean up when widget is disposed
   @override
   void dispose() {
     print('🧹 Disposing HomePage and LiveConditionService');
@@ -117,7 +110,6 @@ class _HomePageState extends State<HomePage> {
 
     return Stack(
       children: [
-        // Gradient background (blue gradient for all pages)
         Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -130,231 +122,190 @@ class _HomePageState extends State<HomePage> {
         Scaffold(
           backgroundColor: Colors.transparent,
           body: SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
-              child: Column(
-                children: [
-                  // Upper shield: Settings icon, Logo, Notifications
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      HoverCircleIcon(iconData: Icons.settings),
-                      Image.asset(
-                        'assets/smartfarm_logo.png',
-                        height: 58,
-                        errorBuilder:
-                            (context, error, stackTrace) =>
-                                const Icon(Icons.image_not_supported),
-                      ),
-                      HoverCircleIcon(iconData: Icons.notifications_none),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .center, // UPDATED for vertical centering
-                    children: [
-                      // Left side: Greetings
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  getIcon().iconData,
-                                  size: 30,
-                                  color: getIcon().iconColor,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  "Good ${getGreeting()}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 30,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 0),
-                            const Text(
-                              'Welcome Home!',
-                              style: TextStyle(
-                                fontWeight: FontWeight.normal,
-                                fontSize: 20,
-                              ),
-                            ),
-                          ],
+            // MODIFICATION START: Wrap with SingleChildScrollView and move Padding inside
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
+                child: Column(
+                  children: [
+                    // Upper shield: Settings icon, Logo, Notifications
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        HoverCircleIcon(iconData: Icons.settings),
+                        Image.asset(
+                          'assets/smartfarm_logo.png',
+                          height: 58,
+                          errorBuilder:
+                              (context, error, stackTrace) =>
+                                  const Icon(Icons.image_not_supported),
                         ),
-                      ),
-                      // Right side: Connection Status Indicator
-                      if (liveService != null)
-                        Container(
-                          // margin: const EdgeInsets.only(top: 4), // REMOVED manual margin
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                liveService!.isConnected
-                                    ? Colors.green.withOpacity(0.2)
-                                    : Colors.red.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                        HoverCircleIcon(iconData: Icons.notifications_none),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Greetings and Connection Status Row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
                           child: Column(
-                            // UPDATED from Row to Column
-                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                liveService!.isConnected
-                                    ? Icons.wifi
-                                    : Icons.wifi_off,
-                                size: 18, // Slightly larger icon
-                                color:
-                                    liveService!.isConnected
-                                        ? Colors.green
-                                        : Colors.red,
+                              Row(
+                                children: [
+                                  Icon(
+                                    getIcon().iconData,
+                                    size: 28,
+                                    color: getIcon().iconColor,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    "Good ${getGreeting()}",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 28,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(
-                                height: 2,
-                              ), // Small gap between icon and text
-                              Text(
-                                liveService!.isConnected
-                                    ? 'Connected'
-                                    : 'Disconnected',
+                              const SizedBox(height: 0),
+                              const Text(
+                                'Welcome Home!',
                                 style: TextStyle(
-                                  fontSize:
-                                      10, // Smaller font for text below icon
-                                  color:
-                                      liveService!.isConnected
-                                          ? Colors.green[800]
-                                          : Colors.red[800],
+                                  fontWeight: FontWeight.normal,
+                                  fontSize: 20,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      // ADD THIS SizedBox to push the indicator a bit to the left
-                      if (liveService != null) const SizedBox(width: 5.0),
-                    ],
-                  ),
-
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
+                        if (liveService != null)
                           Container(
-                            margin: EdgeInsets.symmetric(
-                              vertical: screenWidth * 0.04,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
                             ),
-                            height: 212, // increased height to accommodate dots
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
+                              color:
+                                  liveService!.isConnected
+                                      ? Colors.green.withOpacity(0.2)
+                                      : Colors.red.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Expanded(
-                                  child: Stack(
-                                    children: [
-                                      CarouselSlider(
-                                        options: CarouselOptions(
-                                          height: 190,
-                                          viewportFraction: 1.0,
-                                          autoPlay: false,
-                                          autoPlayInterval: const Duration(
-                                            seconds: 3,
-                                          ),
-                                          enlargeCenterPage: false,
-                                          enableInfiniteScroll: true,
-                                          onPageChanged: (index, reason) {
-                                            setState(() {
-                                              _currentCarouselIndex = index;
-                                            });
-                                          },
-                                        ),
-                                        items:
-                                            cameraPreviewImages.asMap().entries.map((
-                                              entry,
-                                            ) {
-                                              int index = entry.key;
-                                              String imagePath = entry.value;
-                                              return Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 3.0,
-                                                    ),
-                                                child: ClipRRect(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  child: Stack(
-                                                    children: [
-                                                      Image.asset(
-                                                        imagePath,
-                                                        fit: BoxFit.cover,
-                                                        width: double.infinity,
-                                                      ),
-                                                      Positioned(
-                                                        top: 8,
-                                                        right: 8,
-                                                        child: Container(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 4,
-                                                              ),
-                                                          decoration: BoxDecoration(
-                                                            color:
-                                                                Colors.black45,
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  8,
-                                                                ),
-                                                          ),
-                                                          child: Text(
-                                                            cameraLabels[index],
-                                                            style:
-                                                                const TextStyle(
-                                                                  color:
-                                                                      Colors
-                                                                          .white,
-                                                                  fontSize: 12,
-                                                                ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              );
-                                            }).toList(),
-                                      ),
-                                    ],
+                                Icon(
+                                  liveService!.isConnected
+                                      ? Icons.wifi
+                                      : Icons.wifi_off,
+                                  size: 18,
+                                  color:
+                                      liveService!.isConnected
+                                          ? Colors.green
+                                          : Colors.red,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  liveService!.isConnected
+                                      ? 'Connected'
+                                      : 'Disconnected',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color:
+                                        liveService!.isConnected
+                                            ? Colors.green[800]
+                                            : Colors.red[800],
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children:
+                              ],
+                            ),
+                          ),
+                        if (liveService != null) const SizedBox(width: 5.0),
+                      ],
+                    ),
+                    // MODIFICATION: Removed Expanded widget and nested SingleChildScrollView.
+                    // Content from the nested Column is now directly here.
+
+                    // Carousel Container
+                    Container(
+                      margin: EdgeInsets.symmetric(
+                        vertical: screenWidth * 0.04,
+                      ),
+                      height: 212,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                CarouselSlider(
+                                  options: CarouselOptions(
+                                    height: 190,
+                                    viewportFraction: 1.0,
+                                    autoPlay: false,
+                                    autoPlayInterval: const Duration(
+                                      seconds: 3,
+                                    ),
+                                    enlargeCenterPage: false,
+                                    enableInfiniteScroll: true,
+                                    onPageChanged: (index, reason) {
+                                      setState(() {
+                                        _currentCarouselIndex = index;
+                                      });
+                                    },
+                                  ),
+                                  items:
                                       cameraPreviewImages.asMap().entries.map((
                                         entry,
                                       ) {
-                                        return GestureDetector(
-                                          child: Container(
-                                            width: 8.0,
-                                            height: 8.0,
-                                            margin: const EdgeInsets.symmetric(
-                                              horizontal: 4.0,
+                                        int index = entry.key;
+                                        String imagePath = entry.value;
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 3.0,
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
                                             ),
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color:
-                                                  _currentCarouselIndex ==
-                                                          entry.key
-                                                      ? Colors.blueAccent
-                                                      : Colors.grey[300],
+                                            child: Stack(
+                                              children: [
+                                                Image.asset(
+                                                  imagePath,
+                                                  fit: BoxFit.cover,
+                                                  width: double.infinity,
+                                                ),
+                                                Positioned(
+                                                  top: 8,
+                                                  right: 8,
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.black45,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      cameraLabels[index],
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         );
@@ -363,130 +314,160 @@ class _HomePageState extends State<HomePage> {
                               ],
                             ),
                           ),
-                          GridView.count(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            childAspectRatio: 1.25,
-                            children: [
-                              SensorCard(
-                                title: 'Temperature',
-                                // UPDATED: Use live data if available, otherwise use variables.dart
-                                value:
-                                    liveService
-                                        ?.getFormattedCondition('temperature')
-                                        .split(' ')[0] ??
-                                    temperature,
-                                unit: '°C',
-                                setpoint:
-                                    liveService?.getFormattedSetpoint(
-                                      'temperature',
-                                    ) ??
-                                    getSetpoint('temperature'),
-                                icon: Icons.thermostat,
-                                iconColor: Colors.redAccent,
-                              ),
-                              SensorCard(
-                                title: 'Humidity',
-                                value:
-                                    liveService
-                                        ?.getFormattedCondition('humidity')
-                                        .split(' ')[0] ??
-                                    humidity,
-                                unit: '%',
-                                setpoint:
-                                    liveService?.getFormattedSetpoint(
-                                      'humidity',
-                                    ) ??
-                                    getSetpoint('humidity'),
-                                icon: Icons.water_drop,
-                                iconColor: Colors.blueAccent,
-                              ),
-                              SensorCard(
-                                title: 'CO₂',
-                                value:
-                                    liveService
-                                        ?.getFormattedCondition('co2')
-                                        .split(' ')[0] ??
-                                    co2,
-                                unit: 'ppm',
-                                setpoint:
-                                    liveService?.getFormattedSetpoint('co2') ??
-                                    getSetpoint('co2'),
-                                icon: Icons.cloud,
-                                iconColor: Colors.green,
-                              ),
-                              SensorCard(
-                                title: 'Light',
-                                value:
-                                    liveService
-                                        ?.getFormattedCondition('light')
-                                        .split(' ')[0] ??
-                                    lightIntensity,
-                                unit: 'LUX',
-                                setpoint:
-                                    liveService?.getFormattedSetpoint(
-                                      'light',
-                                    ) ??
-                                    getSetpoint('light'),
-                                icon: Icons.wb_sunny,
-                                iconColor: Colors.orangeAccent,
-                                extraInfo: getMode('light'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 25),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 40,
-                            child: FilledButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) =>
-                                            const NightDaySettingsPage(),
-                                  ),
-                                );
-                              },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.blue,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Icon(
-                                    Icons.access_time,
-                                    size: 20,
-                                    color: Colors.white,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Night / Day Hour Settings',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children:
+                                cameraPreviewImages.asMap().entries.map((
+                                  entry,
+                                ) {
+                                  return GestureDetector(
+                                    // onTap can be added here if you want to navigate carousel by tapping dots
+                                    child: Container(
+                                      width: 8.0,
+                                      height: 8.0,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 4.0,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color:
+                                            _currentCarouselIndex == entry.key
+                                                ? Colors.blueAccent
+                                                : Colors.grey[300],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                                  );
+                                }).toList(),
                           ),
-                          const SizedBox(height: 25),
                         ],
                       ),
                     ),
-                  ),
-                ],
+
+                    // Sensor Cards GridView
+                    GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      shrinkWrap:
+                          true, // Important for GridView in SingleChildScrollView
+                      physics:
+                          const NeverScrollableScrollPhysics(), // Also important
+                      childAspectRatio: 1.25,
+                      children: [
+                        SensorCard(
+                          title: 'Temperature',
+                          value:
+                              liveService
+                                  ?.getFormattedCondition('temperature')
+                                  .split(' ')[0] ??
+                              temperature, // Assumes 'temperature' is defined in variables.dart
+                          unit: '°C',
+                          setpoint:
+                              liveService?.getFormattedSetpoint(
+                                'temperature',
+                              ) ??
+                              getSetpoint('temperature'),
+                          icon: Icons.thermostat,
+                          iconColor: Colors.redAccent,
+                        ),
+                        SensorCard(
+                          title: 'Humidity',
+                          value:
+                              liveService
+                                  ?.getFormattedCondition('humidity')
+                                  .split(' ')[0] ??
+                              humidity, // Assumes 'humidity' is defined in variables.dart
+                          unit: '%',
+                          setpoint:
+                              liveService?.getFormattedSetpoint('humidity') ??
+                              getSetpoint('humidity'),
+                          icon: Icons.water_drop,
+                          iconColor: Colors.blueAccent,
+                        ),
+                        SensorCard(
+                          title: 'CO₂',
+                          value:
+                              liveService
+                                  ?.getFormattedCondition('co2')
+                                  .split(' ')[0] ??
+                              co2, // Assumes 'co2' is defined in variables.dart
+                          unit: 'ppm',
+                          setpoint:
+                              liveService?.getFormattedSetpoint('co2') ??
+                              getSetpoint('co2'),
+                          icon: Icons.cloud,
+                          iconColor: Colors.green,
+                        ),
+                        SensorCard(
+                          title: 'Light',
+                          value:
+                              liveService
+                                  ?.getFormattedCondition('light')
+                                  .split(' ')[0] ??
+                              lightIntensity, // Assumes 'lightIntensity' is defined in variables.dart
+                          unit: 'LUX',
+                          setpoint:
+                              liveService?.getFormattedSetpoint('light') ??
+                              getSetpoint('light'),
+                          icon: Icons.wb_sunny,
+                          iconColor: Colors.orangeAccent,
+                          extraInfo: getMode('light'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 25),
+
+                    // Night/Day Settings Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 40,
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => const NightDaySettingsPage(),
+                            ),
+                          );
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.access_time,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Night / Day Hour Settings',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    Colors
+                                        .white, // Ensure text is white for FilledButton
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+                  ],
+                ),
               ),
             ),
+            // MODIFICATION END
           ),
         ),
       ],
@@ -502,7 +483,6 @@ class _HomePageState extends State<HomePage> {
         : "Night,";
   }
 
-  // Updated getIcon method with color changes
   IconDataAndColor getIcon() {
     final int hour = DateTime.now().hour;
     if (hour >= 5 && hour < 18) {
@@ -518,11 +498,9 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Method to get the correct setpoint based on the time of day
   String getSetpoint(String sensor) {
     final int hour = DateTime.now().hour;
     if (hour >= 5 && hour < 18) {
-      // Daytime values
       switch (sensor) {
         case 'temperature':
           return '${dayTemperature.toString()} °C';
@@ -540,7 +518,6 @@ class _HomePageState extends State<HomePage> {
           return '0';
       }
     } else {
-      // Nighttime values
       switch (sensor) {
         case 'temperature':
           return '${nightTemperature.toString()} °C';
@@ -560,25 +537,21 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Method to get the correct mode based on the time of day
   String getMode(String sensor) {
     final int hour = DateTime.now().hour;
     if (hour >= 5 && hour < 18) {
-      // Daytime mode
       if (sensor == 'light') {
-        return dayLightMode; // Return the day mode
+        return dayLightMode;
       }
     } else {
-      // Nighttime mode
       if (sensor == 'light') {
-        return nightLightMode; // Return the night mode
+        return nightLightMode;
       }
     }
     return '';
   }
 }
 
-// Rest of your classes remain the same...
 class IconDataAndColor {
   final IconData iconData;
   final Color iconColor;
@@ -596,20 +569,19 @@ class HoverCircleIcon extends StatefulWidget {
 }
 
 class _HoverCircleIconState extends State<HoverCircleIcon> {
-  final bool _isPressed = false;
+  bool _isPressed =
+      false; // State for visual feedback, actual press handled by onTap
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
         if (widget.iconData == Icons.settings) {
-          // Navigate to Settings page
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const SettingsPage()),
           );
         } else if (widget.iconData == Icons.notifications_none) {
-          // Navigate to Notifications page
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -618,26 +590,44 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
           );
         }
       },
+      onHighlightChanged: (pressed) {
+        // Used for visual feedback on press
+        setState(() {
+          _isPressed = pressed;
+        });
+      },
       borderRadius: BorderRadius.circular(50),
       splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
-      highlightColor: const Color.fromRGBO(0, 123, 255, 0.1),
+      highlightColor: const Color.fromRGBO(
+        0,
+        123,
+        255,
+        0.1,
+      ), // More subtle highlight
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 150), // Faster animation
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color:
               _isPressed
-                  ? const Color.fromARGB(255, 109, 109, 109)
+                  ? const Color.fromARGB(
+                    255,
+                    200,
+                    200,
+                    200,
+                  ) // Example pressed color
                   : Colors.transparent,
         ),
         child: Icon(
           widget.iconData,
           size: 24,
-          color:
-              _isPressed
-                  ? const Color.fromARGB(255, 255, 255, 255)
-                  : const Color.fromARGB(221, 0, 0, 0),
+          color: const Color.fromARGB(
+            221,
+            0,
+            0,
+            0,
+          ), // Icon color remains constant
         ),
       ),
     );
@@ -697,7 +687,7 @@ class SensorCard extends StatelessWidget {
                 ),
               ),
               if (extraInfo != null) ...[
-                const Spacer(),
+                // Removed Spacer to allow natural positioning based on Expanded
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
