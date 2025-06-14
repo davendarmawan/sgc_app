@@ -70,7 +70,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _pages = const [
     HomePage(), // Home Page
-    GraphPage(), // Graph Page
+    GraphPage(deviceId: 1), // Graph Page
     SetpointPage(), // Setpoint Page
     CameraPage(), // Camera Page
     SpectrumPage(), // Spectrum Page

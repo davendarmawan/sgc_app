@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'variables.dart'; // Assuming xLabels is accessible here for initial calculation
 import 'settings.dart'; // Assuming this exists
 import 'notifications_loader.dart'; // Assuming this exists
+import 'services/ondate_service.dart'; // Import the API service
 import 'dart:math';
 
 class GraphPage extends StatefulWidget {
-  const GraphPage({super.key});
+  final int? deviceId; // Make device ID optional
+  
+  const GraphPage({super.key, this.deviceId});
 
   @override
   State<GraphPage> createState() => _GraphPageState();
@@ -18,6 +20,22 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   late Map<String, TransformationController> _graphControllers;
   final bool _isPanEnabled = true;
   final bool _isScaleEnabled = true;
+
+  // Device selection
+  int? _selectedDeviceId;
+  List<Device> _availableDevices = [];
+  bool _isLoadingDevices = false;
+
+  // Loading and error states
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  // Data from API
+  List<String> _xLabels = [];
+  List<double> _temperatureValues = [];
+  List<double> _humidityValues = [];
+  List<double> _co2Values = [];
+  List<double> _lightIntensityValues = [];
 
   final List<String> _graphTitles = [
     'Temperature',
@@ -47,11 +65,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
 
     // Initialize intervals and add listeners
     for (var title in _graphTitles) {
-      _xAxisIntervals[title] = _calculateXAxisInterval(
-        currentDataLength:
-            xLabels.length, // Assuming xLabels is available and populated
-        currentScale: 1.0,
-      );
+      _xAxisIntervals[title] = 1.0; // Default value
       _graphControllers[title]?.addListener(() {
         if (mounted) {
           setState(() {
@@ -59,8 +73,97 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
             // the button's enabled state based on controller.value
           });
         }
-        // Assuming xLabels is the relevant list for label count.
-        _updateXAxisIntervalForGraph(title, xLabels.length);
+        _updateXAxisIntervalForGraph(title, _xLabels.length);
+      });
+    }
+
+    // Set initial device ID if provided
+    _selectedDeviceId = widget.deviceId;
+
+    // Load devices and initial data
+    _loadDevices();
+  }
+
+  // Load available devices
+  Future<void> _loadDevices() async {
+    setState(() {
+      _isLoadingDevices = true;
+    });
+
+    try {
+      // If deviceId was provided in constructor, use it and load data
+      if (_selectedDeviceId != null) {
+        await _loadData();
+      } else {
+        // TODO: Load available devices from API
+        // For now, we'll create some sample devices
+        // You should replace this with actual API call to get user's devices
+        _availableDevices = [
+          Device(id: 1, name: 'Device 1'),
+          Device(id: 2, name: 'Device 2'),
+          Device(id: 3, name: 'Device 3'),
+        ];
+        
+        // Select first device by default if available
+        if (_availableDevices.isNotEmpty) {
+          _selectedDeviceId = _availableDevices.first.id;
+          await _loadData();
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load devices: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoadingDevices = false;
+      });
+    }
+  }
+
+  // Load data from API
+  Future<void> _loadData() async {
+    if (_selectedDeviceId == null) {
+      setState(() {
+        _errorMessage = 'No device selected';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final String dateString = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final ConditionData conditionData = await ApiService.getConditionData(
+        _selectedDeviceId!,
+        date: dateString,
+      );
+
+      setState(() {
+        _xLabels = conditionData.xLabels;
+        _temperatureValues = conditionData.temperatureValues;
+        _humidityValues = conditionData.humidityValues;
+        _co2Values = conditionData.co2Values;
+        _lightIntensityValues = conditionData.lightIntensityValues;
+        _isLoading = false;
+
+        // Recalculate intervals for all graphs
+        for (var title in _graphTitles) {
+          _instantTransformationReset(_graphControllers[title]!);
+          _xAxisIntervals[title] = _calculateXAxisInterval(
+            currentDataLength: _xLabels.length,
+            currentScale: 1.0,
+          );
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
       });
     }
   }
@@ -69,29 +172,17 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     required int currentDataLength,
     required double currentScale,
   }) {
-    const double targetLabelsInView =
-        7.0; // General target for number of labels in view
-    const double segmentsInView =
-        targetLabelsInView - 1.0; // Corresponding segments (6)
+    const double targetLabelsInView = 7.0;
+    const double segmentsInView = targetLabelsInView - 1.0;
 
-    // If the total dataset is small (e.g., 7 or fewer points), show all labels.
     if (currentDataLength <= targetLabelsInView) {
       return 1.0;
     }
 
-    // Estimate the number of data points currently visible in the viewport.
-    // Ensure estimatedVisiblePoints is at least 1.0 to avoid issues in calculations.
     double estimatedVisiblePoints = max(1.0, currentDataLength / currentScale);
-
-    // Calculate the ideal interval that would aim to show targetLabelsInView
-    // within the current estimatedVisiblePoints.
     double idealInterval = (estimatedVisiblePoints / segmentsInView);
     double calculatedInterval = idealInterval.roundToDouble();
 
-    // Clamp the calculated interval:
-    // Minimum interval is 1.0.
-    // Maximum interval is what would show targetLabelsInView across the *entire* dataset (when scale is 1.0).
-    // This prevents the interval from becoming excessively large when zoomed out.
     double maxSensibleIntervalOverall = (currentDataLength / segmentsInView)
         .roundToDouble()
         .clamp(1.0, double.infinity);
@@ -100,8 +191,6 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
       maxSensibleIntervalOverall,
     );
 
-    // This function should now correctly return 1.0 when currentScale is high enough
-    // due to the adjusted dynamicMaxScale in _buildGraphSection.
     return calculatedInterval;
   }
 
@@ -109,9 +198,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     if (!mounted || _graphControllers[graphTitle] == null) return;
 
     final controller = _graphControllers[graphTitle]!;
-    final scale =
-        controller.value
-            .getMaxScaleOnAxis(); // Get current scale from the controller
+    final scale = controller.value.getMaxScaleOnAxis();
 
     final double newInterval = _calculateXAxisInterval(
       currentDataLength: numLabels,
@@ -146,28 +233,16 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
-        // When date changes, assume xLabels and other data might change.
-        // Reset graph views and recalculate intervals based on potentially new data.
-        // TODO: Fetch new data (xLabels, yValues) based on _selectedDate here.
-        // For now, we'll assume xLabels is updated externally before this rebuild.
-        for (var title in _graphTitles) {
-          _instantTransformationReset(
-            _graphControllers[title]!,
-          ); // Resets controller scale to 1.0
-          _xAxisIntervals[title] = _calculateXAxisInterval(
-            currentDataLength:
-                xLabels.length, // Use potentially updated xLabels.length
-            currentScale: 1.0, // Scale is reset
-          );
-        }
       });
+      // Reload data for the new date
+      await _loadData();
     }
   }
 
   void _instantTransformationReset(TransformationController controller) {
     if (!mounted) return;
     setState(() {
-      controller.value = Matrix4.identity(); // Resets scale to 1.0
+      controller.value = Matrix4.identity();
       String? graphTitleToUpdate;
       _graphControllers.forEach((title, c) {
         if (c == controller) {
@@ -176,8 +251,8 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
       });
       if (graphTitleToUpdate != null) {
         _xAxisIntervals[graphTitleToUpdate!] = _calculateXAxisInterval(
-          currentDataLength: xLabels.length, // Use current xLabels.length
-          currentScale: 1.0, // Scale is now 1.0
+          currentDataLength: _xLabels.length,
+          currentScale: 1.0,
         );
       }
     });
@@ -226,7 +301,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
             });
             if (graphTitleToUpdate != null) {
               _xAxisIntervals[graphTitleToUpdate!] = _calculateXAxisInterval(
-                currentDataLength: xLabels.length,
+                currentDataLength: _xLabels.length,
                 currentScale: 1.0,
               );
             }
@@ -247,14 +322,54 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     _graphResetAnimationController!.forward(from: 0.0);
   }
 
+  // Calculate appropriate Y-axis interval
+  double _calculateYAxisInterval(double minY, double maxY) {
+    double range = maxY - minY;
+    if (range <= 0) return 1.0;
+    
+    // Target around 5-7 labels on Y-axis
+    double rawInterval = range / 6;
+    
+    // Round to nice numbers
+    if (rawInterval < 1) {
+      return 0.5;
+    } else if (rawInterval < 2) {
+      return 1.0;
+    } else if (rawInterval < 5) {
+      return 2.0;
+    } else if (rawInterval < 10) {
+      return 5.0;
+    } else if (rawInterval < 20) {
+      return 10.0;
+    } else if (rawInterval < 50) {
+      return 20.0;
+    } else if (rawInterval < 100) {
+      return 50.0;
+    } else {
+      return (rawInterval / 10).ceil() * 10;
+    }
+  }
+
+  // Format Y-axis labels based on the graph type
+  String _formatYAxisLabel(double value, String graphTitle) {
+    switch (graphTitle) {
+      case 'Temperature':
+        return '${value.toInt()}°C';
+      case 'Humidity':
+        return '${value.toInt()}%';
+      case 'CO₂ Level':
+        return '${value.toInt()}ppm';
+      case 'Average Light Intensity':
+        return '${value.toInt()}';
+      default:
+        return value.toStringAsFixed(0);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final String formattedDate = DateFormat(
-      'dd MMM yyyy',
-    ).format(_selectedDate);
-
-    final int currentXLabelsCount = xLabels.length;
+    final String formattedDate = DateFormat('dd MMM yyyy').format(_selectedDate);
 
     return Stack(
       children: [
@@ -292,11 +407,10 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                         Image.asset(
                           'assets/smartfarm_logo.png',
                           height: 58,
-                          errorBuilder:
-                              (context, error, stackTrace) => const Icon(
-                                Icons.image_not_supported,
-                                size: 58,
-                              ),
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.image_not_supported,
+                            size: 58,
+                          ),
                         ),
                         HoverCircleIcon(
                           iconData: Icons.notifications_none,
@@ -304,9 +418,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder:
-                                    (context) =>
-                                        const NotificationsLoaderPage(),
+                                builder: (context) => const NotificationsLoaderPage(),
                               ),
                             );
                           },
@@ -325,11 +437,76 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 15),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
+                    
+                    // Device Selection
+                    if (_availableDevices.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color.fromRGBO(158, 158, 158, 0.2),
+                              spreadRadius: 1,
+                              blurRadius: 3,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Row(
+                              children: [
+                                SizedBox(width: 5),
+                                Icon(Icons.devices, color: Colors.black87, size: 20),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Select Device',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            DropdownButton<int>(
+                              value: _selectedDeviceId,
+                              items: _availableDevices.map((device) {
+                                return DropdownMenuItem<int>(
+                                  value: device.id,
+                                  child: Text(device.name),
+                                );
+                              }).toList(),
+                              onChanged: _isLoadingDevices || _isLoading 
+                                  ? null 
+                                  : (int? newDeviceId) async {
+                                      if (newDeviceId != null && newDeviceId != _selectedDeviceId) {
+                                        setState(() {
+                                          _selectedDeviceId = newDeviceId;
+                                        });
+                                        await _loadData();
+                                      }
+                                    },
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              underline: Container(),
+                            ),
+                          ],
+                        ),
                       ),
+                    
+                    const SizedBox(height: 15),
+                    
+                    // Date Selection
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -349,11 +526,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                           const Row(
                             children: [
                               SizedBox(width: 5),
-                              Icon(
-                                Icons.calendar_today,
-                                color: Colors.black87,
-                                size: 20,
-                              ),
+                              Icon(Icons.calendar_today, color: Colors.black87, size: 20),
                               SizedBox(width: 12),
                               Text(
                                 'Select Date',
@@ -366,16 +539,11 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                             ],
                           ),
                           ElevatedButton(
-                            onPressed: () => _selectDate(context),
+                            onPressed: _isLoading ? null : () => _selectDate(context),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2196F3),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 10,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               elevation: 2,
                             ),
                             child: Text(
@@ -391,58 +559,88 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    _buildGraphSection(
-                      _graphTitles[0],
-                      temperatureValues,
-                      xLabels,
-                      _graphControllers[_graphTitles[0]]!,
-                      _xAxisIntervals[_graphTitles[0]] ??
-                          _calculateXAxisInterval(
-                            currentDataLength: currentXLabelsCount,
-                            currentScale:
-                                _graphControllers[_graphTitles[0]]!.value
-                                    .getMaxScaleOnAxis(),
-                          ),
-                    ),
-                    _buildGraphSection(
-                      _graphTitles[1],
-                      humidityValues,
-                      xLabels,
-                      _graphControllers[_graphTitles[1]]!,
-                      _xAxisIntervals[_graphTitles[1]] ??
-                          _calculateXAxisInterval(
-                            currentDataLength: currentXLabelsCount,
-                            currentScale:
-                                _graphControllers[_graphTitles[1]]!.value
-                                    .getMaxScaleOnAxis(),
-                          ),
-                    ),
-                    _buildGraphSection(
-                      _graphTitles[2],
-                      co2Values,
-                      xLabels,
-                      _graphControllers[_graphTitles[2]]!,
-                      _xAxisIntervals[_graphTitles[2]] ??
-                          _calculateXAxisInterval(
-                            currentDataLength: currentXLabelsCount,
-                            currentScale:
-                                _graphControllers[_graphTitles[2]]!.value
-                                    .getMaxScaleOnAxis(),
-                          ),
-                    ),
-                    _buildGraphSection(
-                      _graphTitles[3],
-                      lightIntensityValues,
-                      xLabels,
-                      _graphControllers[_graphTitles[3]]!,
-                      _xAxisIntervals[_graphTitles[3]] ??
-                          _calculateXAxisInterval(
-                            currentDataLength: currentXLabelsCount,
-                            currentScale:
-                                _graphControllers[_graphTitles[3]]!.value
-                                    .getMaxScaleOnAxis(),
-                          ),
-                    ),
+                    
+                    // Show loading indicator
+                    if (_isLoading || _isLoadingDevices)
+                      const Center(
+                        child: Column(
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 16),
+                            Text('Loading sensor data...'),
+                          ],
+                        ),
+                      )
+                    
+                    // Show error message
+                    else if (_errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Failed to load data',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _errorMessage!,
+                              style: TextStyle(color: Colors.red.shade600),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _loadData,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    
+                    // Show graphs when data is loaded
+                    else ...[
+                      _buildGraphSection(
+                        _graphTitles[0],
+                        _temperatureValues,
+                        _xLabels,
+                        _graphControllers[_graphTitles[0]]!,
+                        _xAxisIntervals[_graphTitles[0]] ?? 1.0,
+                      ),
+                      _buildGraphSection(
+                        _graphTitles[1],
+                        _humidityValues,
+                        _xLabels,
+                        _graphControllers[_graphTitles[1]]!,
+                        _xAxisIntervals[_graphTitles[1]] ?? 1.0,
+                      ),
+                      _buildGraphSection(
+                        _graphTitles[2],
+                        _co2Values,
+                        _xLabels,
+                        _graphControllers[_graphTitles[2]]!,
+                        _xAxisIntervals[_graphTitles[2]] ?? 1.0,
+                      ),
+                      _buildGraphSection(
+                        _graphTitles[3],
+                        _lightIntensityValues,
+                        _xLabels,
+                        _graphControllers[_graphTitles[3]]!,
+                        _xAxisIntervals[_graphTitles[3]] ?? 1.0,
+                      ),
+                    ],
+                    
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -481,7 +679,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
           ],
         ),
         child: Text(
-          'No data available for $title or data mismatch.\nPlease check data sources (yValues length: ${yValues.length}, xLabels length: ${currentXLabels.length}).',
+          'No data available for $title for the selected date.',
           style: const TextStyle(fontSize: 16, color: Colors.grey),
           textAlign: TextAlign.center,
         ),
@@ -504,17 +702,11 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
     final bool isNormalView = controller.value == Matrix4.identity();
     final bool showDots = currentXAxisInterval <= _maxIntervalForDots;
 
-    // Define the maximum zoom scale for the chart.
-    // This is set so that at maximum zoom, roughly 6 data points are visible across the viewport,
-    // which should ensure _calculateXAxisInterval results in an interval of 1.0.
-    // A minimum scale of 5.0 is maintained for very small datasets.
     final double dynamicMaxScale;
     if (currentXLabels.isNotEmpty) {
-      // Ensure at least a scale that shows ~6 points, or a minimum of 5.0
       dynamicMaxScale = max(5.0, currentXLabels.length / 6.0);
     } else {
-      dynamicMaxScale =
-          5.0; // Default if no labels (should ideally not happen with checks)
+      dynamicMaxScale = 5.0;
     }
 
     return Column(
@@ -529,12 +721,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
         Container(
           height: 250,
           margin: const EdgeInsets.only(top: 10),
-          padding: const EdgeInsets.only(
-            left: 18,
-            right: 18,
-            top: 12,
-            bottom: 3,
-          ),
+          padding: const EdgeInsets.only(left: 18, right: 18, top: 12, bottom: 3),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -551,7 +738,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
             transformationConfig: FlTransformationConfig(
               scaleAxis: FlScaleAxis.horizontal,
               minScale: 1,
-              maxScale: dynamicMaxScale, // Use the adjusted dynamicMaxScale
+              maxScale: dynamicMaxScale,
               panEnabled: _isPanEnabled,
               scaleEnabled: _isScaleEnabled,
               transformationController: controller,
@@ -593,10 +780,7 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
                             currentXLabels[index],
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 10,
-                            ),
+                            style: const TextStyle(color: Colors.black, fontSize: 10),
                           ),
                         );
                       }
@@ -604,25 +788,34 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                     },
                   ),
                 ),
-                leftTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 45,
+                    interval: _calculateYAxisInterval(finalMinY, finalMaxY),
+                    getTitlesWidget: (value, meta) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Text(
+                          _formatYAxisLabel(value, title),
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 10,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               ),
               borderData: FlBorderData(
                 show: true,
                 border: Border.all(color: const Color(0xffe7e7e7), width: 1),
               ),
               minX: 0,
-              maxX: (currentXLabels.length - 1).toDouble().clamp(
-                0.0,
-                double.infinity,
-              ),
+              maxX: (currentXLabels.length - 1).toDouble().clamp(0.0, double.infinity),
               minY: finalMinY,
               maxY: finalMaxY,
               lineBarsData: [
@@ -651,15 +844,13 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
               lineTouchData: LineTouchData(
                 handleBuiltInTouches: true,
                 touchTooltipData: LineTouchTooltipData(
-                  getTooltipColor:
-                      (LineBarSpot spot) =>
-                          const Color.fromRGBO(96, 125, 139, 0.9),
+                  getTooltipColor: (LineBarSpot spot) =>
+                      const Color.fromRGBO(96, 125, 139, 0.9),
                   getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
                     return touchedBarSpots
                         .map((barSpot) {
                           final flSpot = barSpot;
-                          if (flSpot.x.toInt() < 0 ||
-                              flSpot.x.toInt() >= currentXLabels.length) {
+                          if (flSpot.x.toInt() < 0 || flSpot.x.toInt() >= currentXLabels.length) {
                             return null;
                           }
 
@@ -680,25 +871,18 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                               break;
                           }
 
-                          const baseStyle = TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          );
+                          const baseStyle = TextStyle(color: Colors.white, fontSize: 12);
                           return LineTooltipItem(
                             '',
                             baseStyle,
                             children: [
                               TextSpan(
                                 text: '$timeLabel\n',
-                                style: baseStyle.copyWith(
-                                  fontWeight: FontWeight.normal,
-                                ),
+                                style: baseStyle.copyWith(fontWeight: FontWeight.normal),
                               ),
                               TextSpan(
                                 text: '${flSpot.y.toStringAsFixed(1)} $unit',
-                                style: baseStyle.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: baseStyle.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ],
                             textAlign: TextAlign.center,
@@ -718,17 +902,11 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
           width: double.infinity,
           height: 40,
           child: FilledButton(
-            onPressed:
-                isNormalView
-                    ? null
-                    : () =>
-                        _animateTransformationControllerToIdentity(controller),
+            onPressed: isNormalView ? null : () => _animateTransformationControllerToIdentity(controller),
             style: FilledButton.styleFrom(
               backgroundColor: Colors.blue,
               disabledBackgroundColor: const Color.fromRGBO(33, 150, 243, 0.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -754,30 +932,13 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
   }
 }
 
-// Dummy SettingsPage and NotificationsLoaderPage for compilation if not defined elsewhere
-// class SettingsPage extends StatelessWidget {
-//   const SettingsPage({super.key});
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(appBar: AppBar(title: const Text('Settings')));
-//   }
-// }
+// Device class for device selection
+class Device {
+  final int id;
+  final String name;
 
-// class NotificationsLoaderPage extends StatelessWidget {
-//   const NotificationsLoaderPage({super.key});
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(appBar: AppBar(title: const Text('Notifications')));
-//   }
-// }
-
-// Dummy data for xLabels and yValues if not available from 'variables.dart'
-// Ensure these are populated in your actual 'variables.dart' or fetched appropriately.
-// List<String> xLabels = List.generate(50, (index) => '${index + 1}:00');
-// List<double> temperatureValues = List.generate(50, (index) => 20 + sin(index / 5) * 5 + Random().nextDouble() * 2);
-// List<double> humidityValues = List.generate(50, (index) => 50 + cos(index / 3) * 10 + Random().nextDouble() * 5);
-// List<double> co2Values = List.generate(50, (index) => 400 + sin(index / 2) * 50 + Random().nextDouble() * 20);
-// List<double> lightIntensityValues = List.generate(50, (index) => 500 + cos(index / 4) * 100 + Random().nextDouble() * 50);
+  Device({required this.id, required this.name});
+}
 
 class HoverCircleIcon extends StatefulWidget {
   final IconData iconData;
@@ -811,10 +972,7 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              _isHovering
-                  ? const Color.fromRGBO(158, 158, 158, 0.1)
-                  : Colors.transparent,
+          color: _isHovering ? const Color.fromRGBO(158, 158, 158, 0.1) : Colors.transparent,
         ),
         child: Icon(
           widget.iconData,
