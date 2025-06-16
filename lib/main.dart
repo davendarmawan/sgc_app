@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'home.dart'; // Import HomePage
-import 'graph.dart'; // Import GraphPage
-import 'setpoint.dart'; // Import SetpointPage
-import 'camera.dart'; // Import CameraPage
-import 'spectrum.dart'; // Import SpectrumPage
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'home.dart';
+import 'graph.dart';
+import 'setpoint.dart';
+import 'camera.dart';
+import 'spectrum.dart';
 import 'login.dart';
+import 'services/auth_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((
-    _,
-  ) {
-    // Set status bar color to transparent
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]).then((_) {
     SystemChrome.setSystemUIOverlayStyle(
-      SystemUiOverlayStyle(
-        systemNavigationBarColor: const Color.fromARGB(255, 255, 255, 255),
+      const SystemUiOverlayStyle(
+        systemNavigationBarColor: Color.fromARGB(255, 255, 255, 255),
         systemNavigationBarIconBrightness: Brightness.dark,
         statusBarIconBrightness: Brightness.dark,
       ),
@@ -38,7 +38,7 @@ class SmartFarmApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
         fontFamily: GoogleFonts.nunito().fontFamily,
       ),
-      home: const LoginPage(), // Set LoginPage as default screen
+      home: const LoginPage(),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -51,8 +51,10 @@ class HomeScreen extends StatefulWidget {
   HomeScreenState createState() => HomeScreenState();
 }
 
-class HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0; // Set the default selected index to Home
+class HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  int _selectedIndex = 0;
+  Timer? _sessionCheckTimer;
+  bool _isCheckingSession = false;
 
   static const List<BottomNavigationBarItem> _bottomNavItems = [
     BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -62,32 +64,130 @@ class HomeScreenState extends State<HomeScreen> {
     BottomNavigationBarItem(icon: Icon(Icons.gradient), label: 'Spectrum'),
   ];
 
+  final List<Widget> _pages = const [
+    HomePage(),
+    GraphPage(deviceId: 1),
+    SetpointPage(),
+    CameraPage(),
+    SpectrumPage(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startSessionMonitoring();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sessionCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Check session when app resumes from background
+    if (state == AppLifecycleState.resumed) {
+      _checkSessionValidity();
+    }
+  }
+
+  /// Start periodic session monitoring
+  void _startSessionMonitoring() {
+    // Check session every 5 minutes
+    _sessionCheckTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      _checkSessionValidity();
+    });
+    
+    // Also check immediately
+    _checkSessionValidity();
+  }
+
+  /// Check if current session is still valid
+  Future<void> _checkSessionValidity() async {
+    if (_isCheckingSession || !mounted) return;
+    
+    setState(() {
+      _isCheckingSession = true;
+    });
+
+    try {
+      final bool isSessionValid = await AuthService.isSessionValid();
+      
+      if (!isSessionValid && mounted) {
+        // Session expired, logout user
+        print('HomeScreen: Session expired, redirecting to login');
+        
+        // Cancel the timer
+        _sessionCheckTimer?.cancel();
+        
+        // Clear remember me since session expired
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('remember_me', false);
+        
+        // Show session expired message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Session expired after 24 hours. Please login again.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        
+        // Navigate to login page
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+            (Route<dynamic> route) => false,
+          );
+        }
+      } else if (isSessionValid) {
+        // Session is valid, optionally show remaining time in debug
+        final remainingHours = await AuthService.getRemainingSessionHours();
+        print('HomeScreen: Session valid, ${remainingHours.toStringAsFixed(1)} hours remaining');
+      }
+    } catch (e) {
+      print('HomeScreen: Error checking session: $e');
+      // On error, assume session is invalid for security
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (Route<dynamic> route) => false,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingSession = false;
+        });
+      }
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
 
-  final List<Widget> _pages = const [
-    HomePage(), // Home Page
-    GraphPage(deviceId: 1), // Graph Page
-    SetpointPage(), // Setpoint Page
-    CameraPage(), // Camera Page
-    SpectrumPage(), // Spectrum Page
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex], // Show the corresponding page
+      body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Color.fromRGBO(255, 255, 255, 1),
-          borderRadius: const BorderRadius.only(
+          borderRadius: BorderRadius.only(
             topLeft: Radius.circular(0),
             topRight: Radius.circular(0),
           ),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
               color: Colors.black26,
               blurRadius: 16,

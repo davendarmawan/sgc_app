@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'settings.dart'; // Assuming this exists
-import 'notifications_loader.dart'; // Assuming this exists
+import 'notifications.dart'; // Assuming this exists
 import 'services/ondate_service.dart'; // Import the API service
 import 'dart:math';
 
@@ -415,10 +415,10 @@ class _GraphPageState extends State<GraphPage> with TickerProviderStateMixin {
                         HoverCircleIcon(
                           iconData: Icons.notifications_none,
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const NotificationsLoaderPage(),
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Notifications require service integration from HomePage'),
+                                duration: Duration(seconds: 2),
                               ),
                             );
                           },
@@ -939,30 +939,35 @@ class Device {
 
   Device({required this.id, required this.name});
 }
+// Replace the HoverCircleIcon class in ALL your files with this version:
 
 class HoverCircleIcon extends StatefulWidget {
   final IconData iconData;
   final VoidCallback? onTap;
+  final int badgeCount;
 
-  const HoverCircleIcon({required this.iconData, this.onTap, super.key});
+  const HoverCircleIcon({
+    required this.iconData,
+    this.onTap,
+    this.badgeCount = 0,
+    super.key,
+  });
 
   @override
   State<HoverCircleIcon> createState() => _HoverCircleIconState();
 }
 
 class _HoverCircleIconState extends State<HoverCircleIcon> {
-  bool _isHovering = false;
+  bool _isPressed = false; // Remove 'final' and add state management
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: widget.onTap,
-      onHover: (hovering) {
-        if (mounted) {
-          setState(() {
-            _isHovering = hovering;
-          });
-        }
+      onTap: widget.onTap, // Use callback instead of hardcoded navigation
+      onHighlightChanged: (pressed) {
+        setState(() {
+          _isPressed = pressed;
+        });
       },
       borderRadius: BorderRadius.circular(50),
       splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
@@ -972,12 +977,46 @@ class _HoverCircleIconState extends State<HoverCircleIcon> {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: _isHovering ? const Color.fromRGBO(158, 158, 158, 0.1) : Colors.transparent,
+          color: _isPressed
+              ? const Color.fromARGB(255, 109, 109, 109)
+              : Colors.transparent,
         ),
-        child: Icon(
-          widget.iconData,
-          size: 24,
-          color: const Color.fromARGB(221, 0, 0, 0),
+        child: Stack(
+          children: [
+            Icon(
+              widget.iconData,
+              size: 24,
+              color: _isPressed
+                  ? const Color.fromARGB(255, 255, 255, 255)
+                  : const Color.fromARGB(221, 0, 0, 0),
+            ),
+            // Notification badge
+            if (widget.badgeCount > 0)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    widget.badgeCount > 99 ? '99+' : widget.badgeCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

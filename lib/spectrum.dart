@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'variables.dart'; // Import the variables file containing data arrays and labels
 import 'settings.dart';
-import 'notifications_loader.dart';
+import 'notifications.dart';
 import 'services/setpoint_service.dart'; // Import the setpoint service
 import 'services/global_state_manager.dart'; // Import the global state manager
 
@@ -406,14 +406,32 @@ class _SpectrumPageState extends State<SpectrumPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            HoverCircleIcon(iconData: Icons.settings),
+                            HoverCircleIcon(
+                              iconData: Icons.settings,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                                );
+                              },
+                            ),
                             Image.asset(
                               'assets/smartfarm_logo.png',
                               height: 58,
                               errorBuilder: (context, error, stackTrace) =>
                                   const Icon(Icons.image_not_supported),
                             ),
-                            HoverCircleIcon(iconData: Icons.notifications_none),
+                            HoverCircleIcon(
+                              iconData: Icons.notifications_none,
+                              onTap: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Notifications require service integration from HomePage'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
                           ],
                         ),
                         const SizedBox(height: 10),
@@ -742,44 +760,84 @@ class _SpectrumPageState extends State<SpectrumPage> {
     );
   }
 }
+// Replace the HoverCircleIcon class in ALL your files with this version:
 
 class HoverCircleIcon extends StatefulWidget {
   final IconData iconData;
+  final VoidCallback? onTap;
+  final int badgeCount;
 
-  const HoverCircleIcon({required this.iconData, super.key});
+  const HoverCircleIcon({
+    required this.iconData,
+    this.onTap,
+    this.badgeCount = 0,
+    super.key,
+  });
 
   @override
   State<HoverCircleIcon> createState() => _HoverCircleIconState();
 }
 
 class _HoverCircleIconState extends State<HoverCircleIcon> {
+  bool _isPressed = false; // Remove 'final' and add state management
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {
-        if (widget.iconData == Icons.settings) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()),
-          );
-        } else if (widget.iconData == Icons.notifications_none) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const NotificationsLoaderPage(),
-            ),
-          );
-        }
+      onTap: widget.onTap, // Use callback instead of hardcoded navigation
+      onHighlightChanged: (pressed) {
+        setState(() {
+          _isPressed = pressed;
+        });
       },
       borderRadius: BorderRadius.circular(50),
       splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
       highlightColor: const Color.fromRGBO(0, 123, 255, 0.1),
-      child: Padding(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(8),
-        child: Icon(
-          widget.iconData,
-          size: 24,
-          color: const Color.fromARGB(221, 0, 0, 0),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _isPressed
+              ? const Color.fromARGB(255, 109, 109, 109)
+              : Colors.transparent,
+        ),
+        child: Stack(
+          children: [
+            Icon(
+              widget.iconData,
+              size: 24,
+              color: _isPressed
+                  ? const Color.fromARGB(255, 255, 255, 255)
+                  : const Color.fromARGB(221, 0, 0, 0),
+            ),
+            // Notification badge
+            if (widget.badgeCount > 0)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    widget.badgeCount > 99 ? '99+' : widget.badgeCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

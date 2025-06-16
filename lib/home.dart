@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'variables.dart'; // Assuming this file exists and contains necessary variables
 import 'settings.dart'; // Assuming this file exists
 import 'nightday.dart'; // Assuming this file exists
-import 'notifications_loader.dart'; // Assuming this file exists
+import 'notifications.dart'; // Import the real notifications page
 import 'package:carousel_slider_plus/carousel_slider_plus.dart';
 import 'services/liveCondition_service.dart'; // Assuming this file exists
 
@@ -19,6 +19,7 @@ class _HomePageState extends State<HomePage> {
   LiveConditionService? liveService;
   bool isLoading = true;
   int _currentCarouselIndex = 0;
+  int _notificationCount = 0; // Track notification count for badge
 
   final List<String> cameraPreviewImages = [
     'assets/image1.png',
@@ -76,6 +77,17 @@ class _HomePageState extends State<HomePage> {
           },
         );
 
+        // Listen for new notifications to update badge count
+        liveService!.notificationStream.listen(
+          (notification) {
+            if (mounted) {
+              setState(() {
+                _notificationCount = liveService!.notificationCount;
+              });
+            }
+          },
+        );
+
         print('✅ Service initialized successfully');
       } else {
         print('⚠️ No JWT token found - user needs to login');
@@ -84,6 +96,7 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         setState(() {
           isLoading = false;
+          _notificationCount = liveService?.notificationCount ?? 0;
         });
       }
     } catch (e, stackTrace) {
@@ -122,7 +135,6 @@ class _HomePageState extends State<HomePage> {
         Scaffold(
           backgroundColor: Colors.transparent,
           body: SafeArea(
-            // MODIFICATION START: Wrap with SingleChildScrollView and move Padding inside
             child: SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
@@ -132,7 +144,15 @@ class _HomePageState extends State<HomePage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        HoverCircleIcon(iconData: Icons.settings),
+                        HoverCircleIcon(
+                          iconData: Icons.settings,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SettingsPage()),
+                            );
+                          },
+                        ),
                         Image.asset(
                           'assets/smartfarm_logo.png',
                           height: 58,
@@ -140,7 +160,35 @@ class _HomePageState extends State<HomePage> {
                               (context, error, stackTrace) =>
                                   const Icon(Icons.image_not_supported),
                         ),
-                        HoverCircleIcon(iconData: Icons.notifications_none),
+                        HoverCircleIcon(
+                          iconData: Icons.notifications_none,
+                          badgeCount: _notificationCount,
+                          onTap: () {
+                            if (liveService != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => NotificationsPage(
+                                    liveConditionService: liveService!,
+                                  ),
+                                ),
+                              ).then((_) {
+                                // Update notification count when returning from notifications page
+                                if (mounted) {
+                                  setState(() {
+                                    _notificationCount = liveService!.notificationCount;
+                                  });
+                                }
+                              });
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Service not initialized. Please wait...'),
+                                ),
+                              );
+                            }
+                          },
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -226,8 +274,6 @@ class _HomePageState extends State<HomePage> {
                         if (liveService != null) const SizedBox(width: 5.0),
                       ],
                     ),
-                    // MODIFICATION: Removed Expanded widget and nested SingleChildScrollView.
-                    // Content from the nested Column is now directly here.
 
                     // Carousel Container
                     Container(
@@ -322,7 +368,6 @@ class _HomePageState extends State<HomePage> {
                                   entry,
                                 ) {
                                   return GestureDetector(
-                                    // onTap can be added here if you want to navigate carousel by tapping dots
                                     child: Container(
                                       width: 8.0,
                                       height: 8.0,
@@ -349,10 +394,8 @@ class _HomePageState extends State<HomePage> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
-                      shrinkWrap:
-                          true, // Important for GridView in SingleChildScrollView
-                      physics:
-                          const NeverScrollableScrollPhysics(), // Also important
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 1.25,
                       children: [
                         SensorCard(
@@ -361,7 +404,7 @@ class _HomePageState extends State<HomePage> {
                               liveService
                                   ?.getFormattedCondition('temperature')
                                   .split(' ')[0] ??
-                              temperature, // Assumes 'temperature' is defined in variables.dart
+                              temperature,
                           unit: '°C',
                           setpoint:
                               liveService?.getFormattedSetpoint(
@@ -377,7 +420,7 @@ class _HomePageState extends State<HomePage> {
                               liveService
                                   ?.getFormattedCondition('humidity')
                                   .split(' ')[0] ??
-                              humidity, // Assumes 'humidity' is defined in variables.dart
+                              humidity,
                           unit: '%',
                           setpoint:
                               liveService?.getFormattedSetpoint('humidity') ??
@@ -391,7 +434,7 @@ class _HomePageState extends State<HomePage> {
                               liveService
                                   ?.getFormattedCondition('co2')
                                   .split(' ')[0] ??
-                              co2, // Assumes 'co2' is defined in variables.dart
+                              co2,
                           unit: 'ppm',
                           setpoint:
                               liveService?.getFormattedSetpoint('co2') ??
@@ -405,7 +448,7 @@ class _HomePageState extends State<HomePage> {
                               liveService
                                   ?.getFormattedCondition('light')
                                   .split(' ')[0] ??
-                              lightIntensity, // Assumes 'lightIntensity' is defined in variables.dart
+                              lightIntensity,
                           unit: 'LUX',
                           setpoint:
                               liveService?.getFormattedSetpoint('light') ??
@@ -453,9 +496,7 @@ class _HomePageState extends State<HomePage> {
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    Colors
-                                        .white, // Ensure text is white for FilledButton
+                                color: Colors.white,
                               ),
                             ),
                           ],
@@ -467,7 +508,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            // MODIFICATION END
           ),
         ),
       ],
@@ -561,73 +601,78 @@ class IconDataAndColor {
 
 class HoverCircleIcon extends StatefulWidget {
   final IconData iconData;
+  final VoidCallback? onTap;
+  final int badgeCount;
 
-  const HoverCircleIcon({required this.iconData, super.key});
+  const HoverCircleIcon({
+    required this.iconData,
+    this.onTap,
+    this.badgeCount = 0,
+    super.key,
+  });
 
   @override
   State<HoverCircleIcon> createState() => _HoverCircleIconState();
 }
 
 class _HoverCircleIconState extends State<HoverCircleIcon> {
-  bool _isPressed =
-      false; // State for visual feedback, actual press handled by onTap
+  bool _isPressed = false;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {
-        if (widget.iconData == Icons.settings) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()),
-          );
-        } else if (widget.iconData == Icons.notifications_none) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const NotificationsLoaderPage(),
-            ),
-          );
-        }
-      },
+      onTap: widget.onTap,
       onHighlightChanged: (pressed) {
-        // Used for visual feedback on press
         setState(() {
           _isPressed = pressed;
         });
       },
       borderRadius: BorderRadius.circular(50),
       splashColor: const Color.fromRGBO(0, 123, 255, 0.2),
-      highlightColor: const Color.fromRGBO(
-        0,
-        123,
-        255,
-        0.1,
-      ), // More subtle highlight
+      highlightColor: const Color.fromRGBO(0, 123, 255, 0.1),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150), // Faster animation
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color:
-              _isPressed
-                  ? const Color.fromARGB(
-                    255,
-                    200,
-                    200,
-                    200,
-                  ) // Example pressed color
-                  : Colors.transparent,
+          color: _isPressed
+              ? const Color.fromARGB(255, 200, 200, 200)
+              : Colors.transparent,
         ),
-        child: Icon(
-          widget.iconData,
-          size: 24,
-          color: const Color.fromARGB(
-            221,
-            0,
-            0,
-            0,
-          ), // Icon color remains constant
+        child: Stack(
+          children: [
+            Icon(
+              widget.iconData,
+              size: 24,
+              color: const Color.fromARGB(221, 0, 0, 0),
+            ),
+            // Notification badge
+            if (widget.badgeCount > 0)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    widget.badgeCount > 99 ? '99+' : widget.badgeCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -687,7 +732,6 @@ class SensorCard extends StatelessWidget {
                 ),
               ),
               if (extraInfo != null) ...[
-                // Removed Spacer to allow natural positioning based on Expanded
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,

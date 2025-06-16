@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
 import 'register.dart';
-import 'services/auth_service.dart'; // Add this import
+import 'services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,33 +18,73 @@ class LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
   bool _isLoading = true;
   bool _obscurePassword = true;
-  bool _isLoginLoading = false; // Add this for login button loading state
+  bool _isLoginLoading = false;
+  String? _sessionMessage; // For showing session expiry messages
 
   @override
   void initState() {
     super.initState();
-    _checkRememberMe();
+    _checkSessionAndRememberMe();
   }
 
-  Future<void> _checkRememberMe() async {
-    final prefs = await SharedPreferences.getInstance();
-    final remembered = prefs.getBool('remember_me') ?? false;
-    
-    // Also check if user is already logged in via AuthService
-    final isLoggedIn = await AuthService.isLoggedIn();
-    
-    if (remembered || isLoggedIn) {
-      if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+  Future<void> _checkSessionAndRememberMe() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final remembered = prefs.getBool('remember_me') ?? false;
+      
+      // Check if user has a valid session (includes 24-hour timeout check)
+      final bool hasValidSession = await AuthService.isSessionValid();
+      
+      if (hasValidSession && remembered) {
+        // Session is valid and user wanted to be remembered
+        print('LoginPage: Valid session found, auto-logging in');
         if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      });
-    } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        });
+        return;
+      } else if (remembered && !hasValidSession) {
+        // User wanted to be remembered but session expired
+        print('LoginPage: Session expired, clearing remember me');
+        await prefs.setBool('remember_me', false);
+        if (!mounted) return;
+        setState(() {
+          _sessionMessage = 'Session expired after 24 hours. Please login again.';
+          _isLoading = false;
+        });
+        
+        // Show session expiry message for 3 seconds
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            setState(() {
+              _sessionMessage = null;
+            });
+          }
+        });
+      } else {
+        // No remember me or no session
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('LoginPage: Error checking session: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
+        _sessionMessage = 'Error checking session. Please login.';
+      });
+      
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _sessionMessage = null;
+          });
+        }
       });
     }
   }
@@ -65,7 +105,7 @@ class LoginPageState extends State<LoginPage> {
       String email = _usernameController.text.trim();
       String password = _passwordController.text;
 
-      // Use AuthService to login
+      // Use AuthService to login (this will store new timestamp)
       bool loginSuccess = await AuthService.loginUser(email, password);
 
       if (loginSuccess) {
@@ -74,11 +114,15 @@ class LoginPageState extends State<LoginPage> {
         
         if (!mounted) return;
         
-        // Show success message
+        // Show success message with session info
+        final remainingHours = await AuthService.getRemainingSessionHours();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
+          SnackBar(
+            content: Text(
+              'Login successful! Session valid for ${remainingHours.toStringAsFixed(1)} hours.',
+            ),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
 
@@ -141,6 +185,34 @@ class LoginPageState extends State<LoginPage> {
               shrinkWrap: true,
               children: [
                 const SizedBox(height: 60),
+                
+                // Session expiry message banner
+                if (_sessionMessage != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.access_time, color: Colors.orange.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _sessionMessage!,
+                            style: TextStyle(
+                              color: Colors.orange.shade800,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
                 Center(
                   child: Column(
                     children: [
@@ -165,14 +237,14 @@ class LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 40),
                 TextFormField(
                   controller: _usernameController,
-                  keyboardType: TextInputType.emailAddress, // Add email keyboard type
+                  keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: 'Email', // Changed from Username to Email
+                    labelText: 'Email',
                     border: OutlineInputBorder(),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.blue, width: 2),
                     ),
-                    prefixIcon: Icon(Icons.email), // Add email icon
+                    prefixIcon: Icon(Icons.email),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -191,7 +263,7 @@ class LoginPageState extends State<LoginPage> {
                     focusedBorder: const OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.blue, width: 2),
                     ),
-                    prefixIcon: const Icon(Icons.lock), // Add lock icon
+                    prefixIcon: const Icon(Icons.lock),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -229,20 +301,29 @@ class LoginPageState extends State<LoginPage> {
                         Set<WidgetState> states,
                       ) {
                         if (states.contains(WidgetState.selected)) {
-                          return Colors.blue; // Color when checked
+                          return Colors.blue;
                         }
-                        return null; // Default color when unchecked
+                        return null;
                       }),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
                     const Text('Remember Me'),
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: 'Keep me logged in for 24 hours',
+                      child: Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: _isLoginLoading ? null : _handleLogin, // Updated to use new login method
+                  onPressed: _isLoginLoading ? null : _handleLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     padding: const EdgeInsets.symmetric(vertical: 10),
