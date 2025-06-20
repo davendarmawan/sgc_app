@@ -114,7 +114,7 @@ class SettingsPage extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const NightDaySettingsPage(),
+                            builder: (context) => const NightDaySettingsPage(deviceId: "1"),
                           ),
                         );
                       },

@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'services/setpoint_service.dart'; // Import your setpoint service
 
 class NightDaySettingsPage extends StatefulWidget {
-  const NightDaySettingsPage({super.key});
+  final String deviceId; // Add device ID parameter
+  
+  const NightDaySettingsPage({
+    super.key,
+    required this.deviceId, // Make device ID required
+  });
 
   @override
   State<NightDaySettingsPage> createState() => _NightDaySettingsPageState();
@@ -13,6 +19,8 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
     minute: 0,
   ); // Default 18:00
   TimeOfDay _dayStartTime = const TimeOfDay(hour: 6, minute: 0); // Default 6:00
+  
+  bool _isLoading = false; // Add loading state
 
   Future<void> _selectTime(BuildContext context, bool isNight) async {
     final TimeOfDay? picked = await showTimePicker(
@@ -39,8 +47,13 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
     );
   }
 
-  void _saveSettings() {
-    // Convert times to total minutes since midnight
+  /// Convert TimeOfDay to "HH.MM" format expected by gateway
+  String _timeOfDayToGatewayFormat(TimeOfDay time) {
+    return '${time.hour.toString().padLeft(2, '0')}.${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _saveSettings() async {
+    // Convert times to total minutes since midnight for validation
     int dayStartMinutes = _dayStartTime.hour * 60 + _dayStartTime.minute;
     int nightStartMinutes = _nightStartTime.hour * 60 + _nightStartTime.minute;
 
@@ -51,24 +64,70 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
           content: Text(
             'Invalid time settings. Day Start Time must be earlier than Night Start Time!',
           ),
+          backgroundColor: Colors.red,
         ),
       );
       return; // Stop saving due to invalid input
     }
 
-    // Format times as 24-hour strings for storage
-    String nightStart24h =
-        '${_nightStartTime.hour.toString().padLeft(2, '0')}:${_nightStartTime.minute.toString().padLeft(2, '0')}';
-    String dayStart24h =
-        '${_dayStartTime.hour.toString().padLeft(2, '0')}:${_dayStartTime.minute.toString().padLeft(2, '0')}';
+    // Show loading state
+    setState(() {
+      _isLoading = true;
+    });
 
-    // Proceed with saving or sending these values to your backend
-    print('Night Start Time (24h): $nightStart24h');
-    print('Day Start Time (24h): $dayStart24h');
+    try {
+      // Convert to gateway format (HH.MM)
+      String dayStartGateway = _timeOfDayToGatewayFormat(_dayStartTime);
+      String nightStartGateway = _timeOfDayToGatewayFormat(_nightStartTime);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Night-Day Hours saved successfully!')),
-    );
+      print('🕐 Sending schedule - Day: $dayStartGateway, Night: $nightStartGateway');
+
+      // Send schedule to API
+      bool success = await SetpointService.sendSchedule(
+        deviceId: widget.deviceId,
+        dayStart: dayStartGateway,
+        nightStart: nightStartGateway,
+      );
+
+      if (success) {
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Night-Day Hours saved successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to save Night-Day Hours. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Error saving schedule: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      // Hide loading state
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -120,9 +179,9 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                 'Selected Device:',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              const Text(
-                'PGC - ITB',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+              Text(
+                widget.deviceId, // Show actual device ID
+                style: const TextStyle(fontSize: 16, color: Colors.grey),
               ),
               const SizedBox(height: 30),
 
@@ -136,7 +195,7 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
               ),
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: () => _selectTime(context, false),
+                onTap: _isLoading ? null : () => _selectTime(context, false),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -144,7 +203,7 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                     horizontal: 20,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _isLoading ? Colors.grey[200] : Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: const [
                       BoxShadow(
@@ -156,11 +215,25 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.wb_sunny, color: Colors.orange),
+                      Icon(
+                        Icons.wb_sunny, 
+                        color: _isLoading ? Colors.grey : Colors.orange,
+                      ),
                       const SizedBox(width: 15),
                       Text(
                         _formatTimeOfDay(_dayStartTime),
-                        style: const TextStyle(fontSize: 18),
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: _isLoading ? Colors.grey : Colors.black,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Format: ${_timeOfDayToGatewayFormat(_dayStartTime)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ],
                   ),
@@ -179,7 +252,7 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
               ),
               const SizedBox(height: 8),
               GestureDetector(
-                onTap: () => _selectTime(context, true),
+                onTap: _isLoading ? null : () => _selectTime(context, true),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -187,7 +260,7 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                     horizontal: 20,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: _isLoading ? Colors.grey[200] : Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: const [
                       BoxShadow(
@@ -199,11 +272,25 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.dark_mode, color: Color(0xFF90A4AE)),
+                      Icon(
+                        Icons.dark_mode, 
+                        color: _isLoading ? Colors.grey : const Color(0xFF90A4AE),
+                      ),
                       const SizedBox(width: 15),
                       Text(
                         _formatTimeOfDay(_nightStartTime),
-                        style: const TextStyle(fontSize: 18),
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: _isLoading ? Colors.grey : Colors.black,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Format: ${_timeOfDayToGatewayFormat(_nightStartTime)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ],
                   ),
@@ -217,27 +304,49 @@ class _NightDaySettingsPageState extends State<NightDaySettingsPage> {
                 width: double.infinity,
                 height: 40,
                 child: FilledButton(
-                  onPressed: _saveSettings,
+                  onPressed: _isLoading ? null : _saveSettings,
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: _isLoading ? Colors.grey : Colors.blue,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.save, size: 20, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text(
-                        'Save Night-Day Hour Settings',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                  child: _isLoading
+                      ? const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Saving...',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        )
+                      : const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.save, size: 20, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text(
+                              'Save Night-Day Hour Settings',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
 

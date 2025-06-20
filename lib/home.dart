@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'variables.dart'; // Assuming this file exists and contains necessary variables
 import 'settings.dart'; // Assuming this file exists
 import 'nightday.dart'; // Assuming this file exists
@@ -21,11 +23,17 @@ class _HomePageState extends State<HomePage> {
   int _currentCarouselIndex = 0;
   int _notificationCount = 0; // Track notification count for badge
 
-  final List<String> cameraPreviewImages = [
-    'assets/image1.png',
-    'assets/image2.png',
-    'assets/image3.png',
-  ];
+  // Camera images data
+  Map<String, List<CameraImage>> _cameraImages = {
+    'top': [],
+    'bottom': [],
+    'user': [],
+  };
+  bool _isLoadingCameraImages = true;
+
+  // Configuration
+  static const String _baseUrl = 'https://demo.smartfarm.id';
+  static const String _deviceId = '1';
 
   final List<String> cameraLabels = [
     'Top Camera',
@@ -33,11 +41,14 @@ class _HomePageState extends State<HomePage> {
     'User Camera',
   ];
 
+  final List<String> cameraTypes = ['top', 'bottom', 'user'];
+
   @override
   void initState() {
     super.initState();
     print('🚀 HomePage initState called');
     _initializeService();
+    _loadCameraImages();
   }
 
   Future<void> _initializeService() async {
@@ -107,6 +118,102 @@ class _HomePageState extends State<HomePage> {
           isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadCameraImages() async {
+    print('🔄 Loading camera images...');
+    try {
+      String? jwtToken = await secureStorage.read(key: 'jwt_token');
+      if (jwtToken == null) {
+        print('⚠️ No JWT token found for camera images');
+        return;
+      }
+
+      final headers = {
+        'Authorization': 'Bearer $jwtToken',
+        'Accept': 'application/json',
+      };
+
+      final List<Future<List<CameraImage>>> futures = [
+        _fetchCameraImages('top', headers),
+        _fetchCameraImages('bottom', headers),
+        _fetchCameraImages('user', headers),
+      ];
+
+      final List<List<CameraImage>> results = await Future.wait(futures);
+
+      if (mounted) {
+        setState(() {
+          _cameraImages['top'] = results[0];
+          _cameraImages['bottom'] = results[1];
+          _cameraImages['user'] = results[2];
+          _isLoadingCameraImages = false;
+        });
+        print('✅ Camera images loaded successfully');
+      }
+    } catch (e) {
+      print('❌ Error loading camera images: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingCameraImages = false;
+        });
+      }
+    }
+  }
+
+  Future<List<CameraImage>> _fetchCameraImages(
+    String position,
+    Map<String, String> headers,
+  ) async {
+    print('🔍 Fetching $position camera images...');
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/file/list$position/$_deviceId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic data = json.decode(response.body);
+        
+        List<dynamic> imageList;
+        if (data is List) {
+          imageList = data;
+        } else if (data is Map<String, dynamic>) {
+          if (data.containsKey('data') && data['data'] is List) {
+            imageList = data['data'];
+          } else if (data.containsKey('files') && data['files'] is List) {
+            imageList = data['files'];
+          } else if (data.containsKey('images') && data['images'] is List) {
+            imageList = data['images'];
+          } else if (data.containsKey('result') && data['result'] is List) {
+            imageList = data['result'];
+          } else {
+            imageList = [];
+          }
+        } else {
+          imageList = [];
+        }
+
+        final List<CameraImage> cameraImages = imageList
+            .map((item) {
+              if (item is Map<String, dynamic>) {
+                return CameraImage.fromJson(item);
+              }
+              return null;
+            })
+            .whereType<CameraImage>()
+            .toList();
+
+        print('📷 Found ${cameraImages.length} images for $position camera');
+        return cameraImages;
+      } else {
+        print('❌ Failed to load $position camera images: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ Error fetching $position camera images: $e');
+      return [];
     }
   }
 
@@ -275,7 +382,7 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
 
-                    // Carousel Container
+                    // Camera Carousel Container - Now shows real images
                     Container(
                       margin: EdgeInsets.symmetric(
                         vertical: screenWidth * 0.04,
@@ -305,57 +412,129 @@ class _HomePageState extends State<HomePage> {
                                       });
                                     },
                                   ),
-                                  items:
-                                      cameraPreviewImages.asMap().entries.map((
-                                        entry,
-                                      ) {
-                                        int index = entry.key;
-                                        String imagePath = entry.value;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 3.0,
-                                          ),
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                            child: Stack(
-                                              children: [
-                                                Image.asset(
-                                                  imagePath,
-                                                  fit: BoxFit.cover,
-                                                  width: double.infinity,
-                                                ),
-                                                Positioned(
-                                                  top: 8,
-                                                  right: 8,
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 8,
-                                                          vertical: 4,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black45,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                    child: Text(
-                                                      cameraLabels[index],
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 12,
+                                  items: List.generate(3, (index) {
+                                    final cameraType = cameraTypes[index];
+                                    final cameraImages = _cameraImages[cameraType] ?? [];
+                                    final latestImage = cameraImages.isNotEmpty ? cameraImages.first : null;
+                                    
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 3.0,
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Stack(
+                                          children: [
+                                            Container(
+                                              width: double.infinity,
+                                              color: Colors.grey[200],
+                                              child: _isLoadingCameraImages
+                                                  ? const Center(
+                                                      child: CircularProgressIndicator(
+                                                        color: Colors.blue,
                                                       ),
-                                                    ),
+                                                    )
+                                                  : latestImage != null && latestImage.imagePath.isNotEmpty
+                                                      ? Image.network(
+                                                          '$_baseUrl${latestImage.imagePath}',
+                                                          fit: BoxFit.cover,
+                                                          width: double.infinity,
+                                                          loadingBuilder: (context, child, loadingProgress) {
+                                                            if (loadingProgress == null) return child;
+                                                            return Center(
+                                                              child: CircularProgressIndicator(
+                                                                value: loadingProgress.expectedTotalBytes != null
+                                                                    ? loadingProgress.cumulativeBytesLoaded /
+                                                                        loadingProgress.expectedTotalBytes!
+                                                                    : null,
+                                                                color: Colors.blue,
+                                                              ),
+                                                            );
+                                                          },
+                                                          errorBuilder: (context, error, stackTrace) {
+                                                            return Center(
+                                                              child: Column(
+                                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                                children: [
+                                                                  const Icon(
+                                                                    Icons.broken_image_outlined,
+                                                                    size: 48,
+                                                                    color: Colors.grey,
+                                                                  ),
+                                                                  const SizedBox(height: 8),
+                                                                  Text(
+                                                                    'Image unavailable',
+                                                                    style: TextStyle(color: Colors.grey[600]),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            );
+                                                          },
+                                                        )
+                                                      : Center(
+                                                          child: Column(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Icon(
+                                                                Icons.camera_alt_outlined,
+                                                                size: 48,
+                                                                color: Colors.grey[400],
+                                                              ),
+                                                              const SizedBox(height: 8),
+                                                              Text(
+                                                                'No image available',
+                                                                style: TextStyle(color: Colors.grey[600]),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                            ),
+                                            Positioned(
+                                              top: 8,
+                                              right: 8,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black45,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: Text(
+                                                  cameraLabels[index],
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
                                                   ),
                                                 ),
-                                              ],
+                                              ),
                                             ),
-                                          ),
-                                        );
-                                      }).toList(),
+                                            // Add refresh button in top-left corner
+                                            Positioned(
+                                              top: 8,
+                                              left: 8,
+                                              child: GestureDetector(
+                                                onTap: _loadCameraImages,
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(4),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black45,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.refresh,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }),
                                 ),
                               ],
                             ),
@@ -363,27 +542,23 @@ class _HomePageState extends State<HomePage> {
                           const SizedBox(height: 4),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children:
-                                cameraPreviewImages.asMap().entries.map((
-                                  entry,
-                                ) {
-                                  return GestureDetector(
-                                    child: Container(
-                                      width: 8.0,
-                                      height: 8.0,
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 4.0,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color:
-                                            _currentCarouselIndex == entry.key
-                                                ? Colors.blueAccent
-                                                : Colors.grey[300],
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
+                            children: List.generate(3, (index) {
+                              return GestureDetector(
+                                child: Container(
+                                  width: 8.0,
+                                  height: 8.0,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 4.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _currentCarouselIndex == index
+                                        ? Colors.blueAccent
+                                        : Colors.grey[300],
+                                  ),
+                                ),
+                              );
+                            }),
                           ),
                         ],
                       ),
@@ -471,7 +646,7 @@ class _HomePageState extends State<HomePage> {
                             context,
                             MaterialPageRoute(
                               builder:
-                                  (context) => const NightDaySettingsPage(),
+                                  (context) => const NightDaySettingsPage(deviceId: "1"),
                             ),
                           );
                         },
@@ -589,6 +764,36 @@ class _HomePageState extends State<HomePage> {
       }
     }
     return '';
+  }
+}
+
+// CameraImage class - add this to your HomePage file
+class CameraImage {
+  final String filename;
+  final String imagePath;
+  final String uploadedAt;
+  final int deviceId;
+
+  CameraImage({
+    required this.filename,
+    required this.imagePath,
+    required this.uploadedAt,
+    required this.deviceId,
+  });
+
+  factory CameraImage.fromJson(Map<String, dynamic> json) {
+    return CameraImage(
+      filename: json['filename'] as String? ?? '',
+      imagePath:
+          (json['image_path'] as String? ?? json['file_url'] as String?) ?? '',
+      uploadedAt: json['uploaded_at'] as String? ?? '',
+      deviceId:
+          (json['device_id'] is int
+              ? json['device_id']
+              : (json['device_id'] is String
+                  ? int.tryParse(json['device_id']) ?? 0
+                  : 0)),
+    );
   }
 }
 
