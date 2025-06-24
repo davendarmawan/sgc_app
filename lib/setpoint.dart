@@ -197,7 +197,7 @@ class SetpointPageState extends State<SetpointPage> {
         dayCO2 = newCO2;
 
         // Update day light settings
-        if (lightMode == 6) {
+        if (lightMode == 0) {
           dayLightMode = 'Manual';
           if (pwmValues != null) {
             parDayPWM = pwmValues['par'];
@@ -220,7 +220,7 @@ class SetpointPageState extends State<SetpointPage> {
         nightCO2 = newCO2;
 
         // Update night light settings
-        if (lightMode == 6) {
+        if (lightMode == 0) {
           nightLightMode = 'Manual';
           if (pwmValues != null) {
             parNightPWM = pwmValues['par'];
@@ -254,7 +254,7 @@ class SetpointPageState extends State<SetpointPage> {
 
       // Update light mode
       if (dayLightMode == 'Manual') {
-        currentLightMode = 6;
+        currentLightMode = 0;
       } else {
         currentLightMode =
             int.tryParse(dayLightMode.replaceAll('Mode ', '')) ?? 1;
@@ -274,7 +274,7 @@ class SetpointPageState extends State<SetpointPage> {
 
       // Update light mode
       if (nightLightMode == 'Manual') {
-        currentLightMode = 6;
+        currentLightMode = 0;
       } else {
         currentLightMode =
             int.tryParse(nightLightMode.replaceAll('Mode ', '')) ?? 1;
@@ -293,7 +293,7 @@ class SetpointPageState extends State<SetpointPage> {
   String get currentModeDescription {
     if (currentLightMode >= 1 && currentLightMode <= 5) {
       return modeDescriptions[currentLightMode - 1];
-    } else if (currentLightMode == 6) {
+    } else if (currentLightMode == 0) {
       return 'Manual';
     } else {
       return 'Unknown';
@@ -710,7 +710,7 @@ class SetpointPageState extends State<SetpointPage> {
                     currentLightMode =
                         int.tryParse(modeNumberString) ?? currentLightMode;
                   } else if (newValue == 'Manual') {
-                    currentLightMode = 6;
+                    currentLightMode = 0;
                   }
                 });
               },
@@ -728,7 +728,7 @@ class SetpointPageState extends State<SetpointPage> {
           const SizedBox(height: 16),
 
           // Light Intensity for Mode 1-4
-          if (currentLightMode != 5 && currentLightMode != 6) ...[
+          if (currentLightMode != 5 && currentLightMode != 0) ...[
             TextField(
               controller: _lightIntensityController,
               keyboardType: const TextInputType.numberWithOptions(
@@ -749,8 +749,8 @@ class SetpointPageState extends State<SetpointPage> {
             ),
           ],
 
-          // Manual PWM Sliders for Mode 6
-          if (currentLightMode == 6) ...[
+          // Manual PWM Sliders for Mode 0
+          if (currentLightMode == 0) ...[
             const SizedBox(height: 5),
             const Center(
               child: Text(
@@ -883,7 +883,7 @@ class SetpointPageState extends State<SetpointPage> {
         _humidityController.text.isEmpty ||
         _co2Controller.text.isEmpty ||
         (currentLightMode != 5 &&
-            currentLightMode != 6 &&
+            currentLightMode != 0 &&
             _lightIntensityController.text.isEmpty)) {
       _showErrorDialog('Please fill in all required fields.');
       return;
@@ -894,21 +894,21 @@ class SetpointPageState extends State<SetpointPage> {
     final double? newHumidity = double.tryParse(_humidityController.text);
     final double? newCO2 = double.tryParse(_co2Controller.text);
     final double? newLightIntensity =
-        currentLightMode != 5 && currentLightMode != 6
+        currentLightMode != 5 && currentLightMode != 0
             ? double.tryParse(_lightIntensityController.text)
             : (currentLightMode == 5 ? 0 : null);
 
     if (newTemp == null ||
         newHumidity == null ||
         newCO2 == null ||
-        (currentLightMode != 6 && newLightIntensity == null)) {
+        (currentLightMode != 0 && newLightIntensity == null)) {
       _showErrorDialog('Please enter valid numeric values.');
       return;
     }
 
     // Validate setpoints against limits
     Map<String, double>? pwmValues;
-    if (currentLightMode == 6) {
+    if (currentLightMode == 0) {
       pwmValues = {
         'par': currentParPWM,
         'red': currentRedPWM,
